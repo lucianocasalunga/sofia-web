@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sofia 5.0 - IA Hacker LiberNet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">🤖</span>
+                    <h1>Sofia <span class="version">5.0</span></h1>
+                </div>
+                <div class="status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Online</span>
+                </div>
+            </div>
+            <p class="tagline">IA Hacker Técnica - LiberNet</p>
+        </header>
+
+        <!-- Chat Container -->
+        <main class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message system-message">
+                    <div class="message-content">
+                        <p class="greeting">👋 Olá! Sou a <strong>Sofia</strong>, sua assistente técnica hacker.</p>
+                        <p><strong>Especialidades:</strong></p>
+                        <ul>
+                            <li>🐍 Python & Bash</li>
+                            <li>🐧 Linux & Sistemas</li>
+                            <li>🔐 Segurança & Pentesting</li>
+                            <li>🌐 Redes & Protocolos</li>
+                        </ul>
+                        <p class="hint">💡 <em>Faça suas perguntas técnicas diretamente!</em></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <form id="chatForm" autocomplete="off">
+                    <div class="input-wrapper">
+                        <textarea
+                            id="userInput"
+                            placeholder="Digite sua mensagem... (Shift+Enter para nova linha)"
+                            rows="1"
+                            autofocus
+                        ></textarea>
+                        <button type="submit" id="sendBtn" class="send-btn">
+                            <span class="send-icon">▶</span>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        <button type="button" id="clearBtn" class="action-btn">🗑️ Limpar</button>
+                        <button type="button" id="memoriaBtn" class="action-btn">🧠 Memória</button>
+                        <span class="model-info">Modelo: <strong>GPT-4o</strong></span>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Memória -->
+    <div id="memoriaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🧠 Memória Compartilhada</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="memoriaContent">Carregando...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sofia - Planos e Preços ⚡</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .logo-back {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
+            animation: pulse-logo 2s ease-in-out infinite;
+            transition: transform 0.2s;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        }
+
+        .logo-back:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.6);
+        }
+
+        .logo-back img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @keyframes pulse-logo {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(0, 255, 65, 0.6);
+            }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #00ff00;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #888;
+        }
+
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .plan-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .plan-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 255, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 255, 0, 0.2);
+        }
+
+        .plan-card.featured {
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .plan-card.featured::before {
+            content: 'POPULAR';
+            position: absolute;
+            top: 1rem;
+            right: -2rem;
+            background: #00ff00;
+            color: #000;
+            padding: 0.3rem 3rem;
+            transform: rotate(45deg);
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .plan-name {
+            font-size: 1.5rem;
+            color: #00ff00;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .plan-description {
+            color: #999;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .plan-tokens {
+            font-size: 2rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .plan-tokens span {
+            font-size: 0.9rem;
+            color: #888;
+            font-weight: normal;
+        }
+
+        .plan-price {
+            margin-bottom: 1.5rem;
+        }
+
+        .price-sats {
+            font-size: 1.8rem;
+            color: #ffa500;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-usd, .price-brl {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .btn-select {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-select:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 255, 0, 0.4);
+        }
+
+        .btn-select.free {
+            background: linear-gradient(135deg, #666 0%, #444 100%);
+            color: #fff;
+        }
+
+        .features {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .features li {
+            padding: 0.5rem 0;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .features li::before {
+            content: '✓';
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        /* Modal de Pagamento */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1a1a1a;
+            border: 2px solid #00ff00;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 68, 68, 0.8);
+            border-color: #ff4444;
+            transform: scale(1.1);
+        }
+
+        .qrcode-container {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .qrcode-container img {
+            max-width: 300px;
+            border: 4px solid #00ff00;
+            border-radius: 8px;
+            padding: 1rem;
+            background: white;
+        }
+
+        .invoice-details {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .invoice-details p {
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            font-weight: 600;
+        }
+
+        .copy-btn:hover {
+            background: #00cc00;
+        }
+
+        .payment-status {
+            text-align: center;
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .payment-status.pending {
+            background: rgba(255, 165, 0, 0.2);
+            color: #ffa500;
+        }
+
+        .payment-status.confirmed {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+        }
+
+        .lightning-icon {
+            color: #ffa500;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #666;
+        }
+
+        .footer a {
+            color: #00ff00;
+            text-decoration: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .checking-payment {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/chat" class="logo-back" title="Voltar para Sofia">
+                <img src="/static/logo-libernet.jpg" alt="LiberNet">
+            </a>
+            <h1>Sofia LiberNet</h1>
+            <p>Inteligência descentralizada. Liberdade conectada.</p>
+        </div>
+
+        <div class="plans-grid">
+            <!-- Free Plan -->
+            <div class="plan-card">
+                <div class="plan-name">Free</div>
+                <div class="plan-description">Teste gratuito com renovação diária</div>
+                <div class="plan-tokens">10k <span>tokens/24h</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">🆓 Grátis</div>
+                    <div class="price-usd">Renova a cada 24h</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="openDonationModal()" style="background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);">💝 Fazer Doação</button>
+            </div>
+
+            <!-- Starter Plan: 500k tokens -->
+            <div class="plan-card">
+                <div class="plan-name">Starter</div>
+                <div class="plan-description">Recarga de tokens</div>
+                <div class="plan-tokens">500k <span>tokens</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">
+                        <span class="lightning-icon">⚡</span> 3.500 sats
+                    </div>
+                    <div class="price-usd">≈ US$ 1,26</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="selectPlan('starter', 500000, 3500)">Recarregar</button>
+            </div>
+
+            <!-- Light Plan: 1M tokens -->
+            <div class="plan-card">
+                <div class="plan-name">Light</div>
+                <div class="plan-description">Recarga de tokens</div>
+                <div class="plan-tokens">1M <span>tokens</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">
+                        <span class="lightning-icon">⚡</span> 7.000 sats
+                    </div>
+                    <div class="price-usd">≈ US$ 2,52</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="selectPlan('light', 1000000, 7000)">Recarregar</button>
+            </div>
+
+            <!-- Standard Plan: 2.5M tokens -->
+            <div class="plan-card featured">
+                <div class="plan-name">Standard</div>
+                <div class="plan-description">Recarga de tokens</div>
+                <div class="plan-tokens">2.5M <span>tokens</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">
+                        <span class="lightning-icon">⚡</span> 17.500 sats
+                    </div>
+                    <div class="price-usd">≈ US$ 6,30</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="selectPlan('standard', 2500000, 17500)">Recarregar</button>
+            </div>
+
+            <!-- Pro Plan: 5M tokens -->
+            <div class="plan-card">
+                <div class="plan-name">Pro</div>
+                <div class="plan-description">Recarga de tokens</div>
+                <div class="plan-tokens">5M <span>tokens</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">
+                        <span class="lightning-icon">⚡</span> 35.000 sats
+                    </div>
+                    <div class="price-usd">≈ US$ 12,60</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="selectPlan('pro', 5000000, 35000)">Recarregar</button>
+            </div>
+
+            <!-- Enterprise Plan: 10M tokens -->
+            <div class="plan-card">
+                <div class="plan-name">Enterprise</div>
+                <div class="plan-description">Recarga de tokens</div>
+                <div class="plan-tokens">10M <span>tokens</span></div>
+                <div class="plan-price">
+                    <div class="price-sats">
+                        <span class="lightning-icon">⚡</span> 70.000 sats
+                    </div>
+                    <div class="price-usd">≈ US$ 25,20</div>
+                </div>
+                <ul class="features">
+                    <li>Sofia 4.0 - Mais econômica</li>
+                    <li>Sofia 4.5 - Mais inteligente</li>
+                </ul>
+                <button class="btn-select" onclick="selectPlan('enterprise', 10000000, 70000)">Recarregar</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by Lightning Network via <a href="https://lnbits.libernet.app" target="_blank">LNbits</a></p>
+            <p>Já tem conta? <a href="/login">Fazer login</a></p>
+        </div>
+    </div>
+
+    <!-- Modal de Doação -->
+    <div class="modal" id="donationModal" onclick="if(event.target === this) closeDonationModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeDonationModal()">×</button>
+            <h2 style="color: #ffa500; margin-bottom: 1rem;">💝 Fazer Doação</h2>
+
+            <div style="margin-bottom: 2rem;">
+                <p style="color: #aaa; margin-bottom: 1rem;">
+                    Apoie o desenvolvimento da Sofia! Escolha o valor da sua doação em sats:
+                </p>
+
+                <input type="number" id="donationAmount" placeholder="Digite o valor em sats"
+                       style="width: 100%; padding: 1rem; background: rgba(255,255,255,0.1);
+                              border: 1px solid #ffa500; border-radius: 8px; color: #fff;
+                              font-size: 1.2rem; text-align: center;"
+                       min="100" value="1000">
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <button onclick="setDonationAmount(1000)" class="copy-btn" style="flex: 1;">1k sats</button>
+                    <button onclick="setDonationAmount(5000)" class="copy-btn" style="flex: 1;">5k sats</button>
+                    <button onclick="setDonationAmount(10000)" class="copy-btn" style="flex: 1;">10k sats</button>
+                    <button onclick="setDonationAmount(21000)" class="copy-btn" style="flex: 1;">21k sats</button>
+                </div>
+
+                <button onclick="processDonation()" class="btn-select" style="width: 100%; margin-top: 1.5rem;">
+                    Gerar QR Code de Doação
+                </button>
+            </div>
+
+            <div id="donationQRSection" style="display: none;">
+                <div class="qrcode-container">
+                    <img id="donationQRImage" src="" alt="QR Code Doação">
+                </div>
+
+                <div class="invoice-details">
+                    <p><strong>Valor da Doação:</strong> <span id="donationAmountDisplay"></span></p>
+                    <p><strong>Invoice:</strong></p>
+                    <p style="font-size: 0.8rem; word-break: break-all;" id="donationInvoice"></p>
+                    <button class="copy-btn" onclick="copyDonationInvoice()">Copiar Invoice</button>
+                </div>
+
+                <div class="payment-status pending">
+                    <p>⏳ Aguardando pagamento...</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">Obrigado pelo seu apoio! 🙏</p>
+                </div>
+            </div>
+
+            <div id="donationConfirmed" style="display: none; text-align: center; padding: 2rem;">
+                <div style="font-size: 4rem; color: #ffa500;">❤️</div>
+                <h3 style="color: #ffa500; margin: 1rem 0;">Doação Recebida!</h3>
+                <p style="color: #888;">Muito obrigado pelo seu apoio à Sofia e à LiberNet!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Pagamento -->
+    <div class="modal" id="paymentModal" onclick="if(event.target === this) closeModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <h2 style="color: #00ff00; margin-bottom: 1rem;" id="modalTitle">Pagamento</h2>
+
+            <div id="loadingPayment" style="text-align: center; padding: 2rem;">
+                <p style="color: #888;">Gerando invoice...</p>
+            </div>
+
+            <div id="qrcodeSection" style="display: none;">
+                <div class="qrcode-container">
+                    <img id="qrcodeImage" src="" alt="QR Code">
+                </div>
+
+                <div class="invoice-details">
+                    <p><strong>Valor:</strong> <span id="invoiceAmount"></span></p>
+                    <p><strong>Invoice:</strong></p>
+                    <p style="font-size: 0.8rem; word-break: break-all;" id="invoiceText"></p>
+                    <button class="copy-btn" onclick="copyInvoice()">Copiar Invoice</button>
+                </div>
+
+                <div class="payment-status pending checking-payment">
+                    <p>⏳ Aguardando pagamento...</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">O pagamento será verificado automaticamente</p>
+                </div>
+            </div>
+
+            <div id="paymentConfirmed" style="display: none; text-align: center; padding: 2rem;">
+                <div style="font-size: 4rem; color: #00ff00;">✓</div>
+                <h3 style="color: #00ff00; margin: 1rem 0;">Pagamento Confirmado!</h3>
+                <p style="color: #888;">Sua conta será ativada em instantes...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let checkPaymentInterval = null;
+        let currentPaymentHash = null;
+
+        function selectPlan(planName, tokens, sats) {
+            console.log('selectPlan chamado:', planName, tokens, sats);
+
+            // Armazenar info do plano para usar depois
+            window.currentRecharge = { planName, tokens, sats };
+
+            // Abrir modal de pagamento
+            document.getElementById('paymentModal').classList.add('active');
+            document.getElementById('loadingPayment').style.display = 'block';
+            document.getElementById('qrcodeSection').style.display = 'none';
+            document.getElementById('paymentConfirmed').style.display = 'none';
+
+            // Criar invoice com o valor em sats
+            fetch('/api/lnbits/create-invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount_sats: sats,
+                    description: `Recarga ${planName} - ${tokens.toLocaleString('pt-BR')} tokens`,
+                    plan: planName,
+                    tokens: tokens
+                })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log('Invoice criada:', data);
+                if (data.success && data.invoice) {
+                    showInvoice(data.invoice, planName, tokens, sats);
+                    startPaymentCheck(data.invoice.payment_hash, planName, tokens);
+                } else {
+                    alert('Erro ao criar invoice: ' + (data.error || 'Erro desconhecido'));
+                    closeModal();
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao criar invoice:', err);
+                alert('Erro na comunicação com servidor: ' + err.message);
+                closeModal();
+            });
+        }
+
+        function showInvoice(invoice, planName, tokens, sats) {
+            // Formatar tokens (ex: 500000 → 500k, 1000000 → 1M)
+            const tokensFormatted = tokens >= 1000000 ?
+                (tokens / 1000000) + 'M' :
+                (tokens / 1000) + 'k';
+
+            document.getElementById('modalTitle').textContent = `Recarga ${planName}`;
+            document.getElementById('invoiceAmount').textContent = `⚡ ${sats.toLocaleString('pt-BR')} sats`;
+            document.getElementById('invoiceText').textContent = invoice.payment_request || invoice.bolt11 || invoice;
+
+            // Gerar QR code
+            const invoiceString = invoice.payment_request || invoice.bolt11 || invoice;
+            document.getElementById('qrcodeImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(invoiceString)}`;
+
+            currentPaymentHash = invoice.payment_hash || invoice.checking_id;
+
+            document.getElementById('loadingPayment').style.display = 'none';
+            document.getElementById('qrcodeSection').style.display = 'block';
+
+            // Adicionar info de tokens abaixo do QR code
+            const infoDiv = document.getElementById('qrcodeSection');
+            let tokensInfo = infoDiv.querySelector('.tokens-info');
+            if (!tokensInfo) {
+                tokensInfo = document.createElement('p');
+                tokensInfo.className = 'tokens-info';
+                tokensInfo.style.cssText = 'color: #aaa; margin-top: 1rem; text-align: center;';
+                infoDiv.appendChild(tokensInfo);
+            }
+            tokensInfo.textContent = `Você receberá ${tokensFormatted} tokens (${tokens.toLocaleString('pt-BR')})`;
+        }
+
+        function startPaymentCheck(paymentHash, plan, tokens) {
+            // Verificar a cada 3 segundos
+            checkPaymentInterval = setInterval(() => {
+                fetch('/api/check-recharge-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payment_hash: paymentHash })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.paid) {
+                        clearInterval(checkPaymentInterval);
+                        showPaymentConfirmed(plan, tokens, data.tokens_credited);
+                    }
+                })
+                .catch(err => console.error('Erro ao verificar pagamento:', err));
+            }, 3000);
+        }
+
+        function showPaymentConfirmed(plan, tokens, tokensCredited) {
+            document.getElementById('qrcodeSection').style.display = 'none';
+            const confirmedDiv = document.getElementById('paymentConfirmed');
+
+            // Formatar tokens
+            const tokensFormatted = tokens >= 1000000 ?
+                (tokens / 1000000) + 'M' :
+                (tokens / 1000) + 'k';
+
+            // Atualizar mensagem de confirmação
+            confirmedDiv.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="font-size: 4rem; color: #4CAF50; margin-bottom: 1rem;">✓</div>
+                    <h3 style="color: #4CAF50; margin-bottom: 1rem;">Pagamento Confirmado!</h3>
+                    <p style="color: #aaa; margin-bottom: 0.5rem;">Recarga ${plan}</p>
+                    <p style="font-size: 1.5rem; color: #fff; margin-bottom: 1rem;">
+                        ${tokensFormatted} tokens (${tokens.toLocaleString('pt-BR')})
+                    </p>
+                    <p style="color: #aaa; font-size: 0.9rem;">Seus tokens foram creditados!</p>
+                    <p style="color: #666; font-size: 0.8rem; margin-top: 1rem;">
+                        Redirecionando para login em 3 segundos...
+                    </p>
+                </div>
+            `;
+
+            confirmedDiv.style.display = 'block';
+
+            // Redirecionar para login após 3 segundos
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 3000);
+        }
+
+        function copyInvoice() {
+            const invoiceText = document.getElementById('invoiceText').textContent;
+            navigator.clipboard.writeText(invoiceText).then(() => {
+                alert('Invoice copiada!');
+            });
+        }
+
+        function closeModal() {
+            if (checkPaymentInterval) {
+                clearInterval(checkPaymentInterval);
+            }
+            document.getElementById('paymentModal').classList.remove('active');
+        }
+
+        // ========== FUNÇÕES DE DOAÇÃO ==========
+
+        let checkDonationInterval = null;
+        let currentDonationHash = null;
+
+        function openDonationModal() {
+            document.getElementById('donationModal').classList.add('active');
+            document.getElementById('donationQRSection').style.display = 'none';
+            document.getElementById('donationConfirmed').style.display = 'none';
+        }
+
+        function closeDonationModal() {
+            if (checkDonationInterval) {
+                clearInterval(checkDonationInterval);
+            }
+            document.getElementById('donationModal').classList.remove('active');
+        }
+
+        function setDonationAmount(amount) {
+            document.getElementById('donationAmount').value = amount;
+        }
+
+        function processDonation() {
+            const amount = parseInt(document.getElementById('donationAmount').value);
+
+            if (!amount || amount < 100) {
+                alert('Por favor, insira um valor mínimo de 100 sats');
+                return;
+            }
+
+            // Criar invoice de doação via LNBits
+            fetch('/api/create-donation-invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount_sats: amount })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showDonationInvoice(data.invoice, amount);
+                    startDonationCheck(data.invoice.payment_hash);
+                } else {
+                    alert('Erro ao criar invoice de doação: ' + (data.error || 'Erro desconhecido'));
+                }
+            })
+            .catch(err => {
+                alert('Erro na comunicação com servidor');
+                console.error(err);
+            });
+        }
+
+        function showDonationInvoice(invoice, amount) {
+            document.getElementById('donationAmountDisplay').textContent = `⚡ ${amount} sats`;
+            document.getElementById('donationInvoice').textContent = invoice.payment_request;
+            document.getElementById('donationQRImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(invoice.payment_request)}`;
+
+            currentDonationHash = invoice.payment_hash;
+
+            document.getElementById('donationQRSection').style.display = 'block';
+        }
+
+        function startDonationCheck(paymentHash) {
+            checkDonationInterval = setInterval(() => {
+                fetch('/api/check-donation-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payment_hash: paymentHash })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.paid) {
+                        clearInterval(checkDonationInterval);
+                        showDonationConfirmed();
+                    }
+                })
+                .catch(err => console.error('Erro ao verificar doação:', err));
+            }, 3000);
+        }
+
+        function showDonationConfirmed() {
+            document.getElementById('donationQRSection').style.display = 'none';
+            document.getElementById('donationConfirmed').style.display = 'block';
+
+            setTimeout(() => {
+                closeDonationModal();
+            }, 5000);
+        }
+
+        function copyDonationInvoice() {
+            const invoiceText = document.getElementById('donationInvoice').textContent;
+            navigator.clipboard.writeText(invoiceText).then(() => {
+                alert('Invoice copiada!');
+            });
+        }
+
+        // Fechar modais com tecla ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const paymentModal = document.getElementById('paymentModal');
+                const donationModal = document.getElementById('donationModal');
+
+                if (paymentModal && paymentModal.classList.contains('active')) {
+                    closeModal();
+                }
+                if (donationModal && donationModal.classList.contains('active')) {
+                    closeDonationModal();
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

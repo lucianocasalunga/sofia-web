@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sofia Web - Planos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0d1117 0%, #1a1d29 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .plans-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .plans-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .plans-header h1 {
+            color: #00ff41;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .plans-header p {
+            color: #8b949e;
+            font-size: 1.1em;
+        }
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .plan-card {
+            background: #161b22;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .plan-card:hover {
+            border-color: #00ff41;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,255,65,0.2);
+        }
+        .plan-card.current {
+            border-color: #00d9ff;
+            background: #1a2332;
+        }
+        .plan-name {
+            color: #c9d1d9;
+            font-size: 1.5em;
+            margin-bottom: 16px;
+        }
+        .plan-price {
+            color: #00ff41;
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .plan-price small {
+            font-size: 0.4em;
+            color: #8b949e;
+        }
+        .plan-tokens {
+            color: #8b949e;
+            margin-bottom: 24px;
+        }
+        .plan-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #00ff41 0%, #00d9ff 100%);
+            border: none;
+            border-radius: 6px;
+            color: #0d1117;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .plan-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,255,65,0.4);
+        }
+        .plan-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .back-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #30363d;
+            color: #c9d1d9;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        .back-btn:hover {
+            background: #484f58;
+        }
+        .current-plan-badge {
+            background: #00d9ff;
+            color: #0d1117;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="plans-container">
+        <div class="plans-header">
+            <div style="margin-bottom: 20px;">
+                <img src="https://media.libernet.app/f/4.png" alt="LiberNet Logo" style="width: 80px; height: 80px; border-radius: 50%;">
+            </div>
+            <h1>💎 Planos Sofia Web</h1>
+            <p>Escolha o plano ideal para suas necessidades</p>
+            <p style="color: #00ff41; font-weight: 600; margin-top: 10px;">
+                Plano Atual: {{ user.plan.upper() }} | Tokens: {{ stats.tokens_remaining }} / {{ user.tokens_limit }}
+            </p>
+        </div>
+
+        <div class="plans-grid">
+            {% for plan_id, plan_info in plans.items() %}
+            <div class="plan-card {% if user.plan == plan_id %}current{% endif %}">
+                {% if user.plan == plan_id %}
+                <span class="current-plan-badge">✓ PLANO ATUAL</span>
+                {% endif %}
+
+                <div class="plan-name">{{ plan_info.name }}</div>
+                <div class="plan-price">
+                    {% if plan_info.price_usd == 0 %}
+                    GRÁTIS
+                    {% else %}
+                    ${{ plan_info.price_usd }}<small>/mês</small>
+                    {% endif %}
+                </div>
+                <div class="plan-tokens">
+                    <strong>{{ plan_info.tokens_month }}</strong> tokens/mês
+                </div>
+
+                {% if plan_info.price_sats > 0 %}
+                <div style="color: #8b949e; margin-bottom: 16px; font-size: 14px;">
+                    ⚡ {{ plan_info.price_sats }} sats
+                </div>
+                {% endif %}
+
+                {% if user.plan == plan_id %}
+                <button class="plan-btn" disabled>Plano Ativo</button>
+                {% elif plan_info.price_sats == 0 %}
+                <button class="plan-btn" disabled>Plano Básico</button>
+                {% else %}
+                <button class="plan-btn" onclick="upgradePlan('{{ plan_id }}')">
+                    Assinar com Lightning ⚡
+                </button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ url_for('chat') }}" class="back-btn">← Voltar ao Chat</a>
+        </div>
+    </div>
+
+    <script>
+        async function upgradePlan(planId) {
+            if (!confirm(`Deseja assinar o plano ${planId.toUpperCase()}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/create-invoice/${planId}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Mostrar invoice Lightning
+                    const invoice = data.payment_request;
+                    const paymentHash = data.payment_hash;
+
+                    alert(`Invoice Lightning gerada!\n\nCopie e pague:\n${invoice.substring(0, 50)}...\n\n(Em produção, aqui seria um QR Code)`);
+
+                    // Iniciar verificação de pagamento
+                    checkPayment(paymentHash);
+                } else {
+                    alert('Erro: ' + (data.error || 'Não foi possível criar invoice'));
+                }
+            } catch (error) {
+                alert('Erro de conexão: ' + error.message);
+            }
+        }
+
+        async function checkPayment(paymentHash) {
+            let checks = 0;
+            const maxChecks = 60; // 5 minutos (5s * 60)
+
+            const interval = setInterval(async () => {
+                checks++;
+
+                if (checks > maxChecks) {
+                    clearInterval(interval);
+                    alert('Timeout: pagamento não detectado');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/check-payment/${paymentHash}`);
+                    const data = await response.json();
+
+                    if (data.paid) {
+                        clearInterval(interval);
+                        alert(`✅ Pagamento confirmado!\n\nSeu plano foi atualizado para: ${data.plan.toUpperCase()}`);
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    console.error('Erro ao verificar pagamento:', error);
+                }
+            }, 5000); // Verificar a cada 5 segundos
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  sofia-web:
+    build: .
+    container_name: sofia-web
+    restart: unless-stopped
+    ports:
+      - "5051:5050"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-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}
+      - SOFIA_MODEL=gpt-4o
+      - SECRET_KEY=${SECRET_KEY}
+      - SOFIA_NOSTR_NSEC=${SOFIA_NOSTR_NSEC}
+      - SOFIA_NOSTR_NPUB=${SOFIA_NOSTR_NPUB}
+      - NOSTR_RELAY_URL=wss://relay.libernet.app
+    volumes:
+      - /opt/memoria_sofia.md:/opt/memoria_sofia.md
+      - ./logs:/app/logs
+      - /mnt/storage/sofia-db:/app/data
+      - ./app.py:/app/app.py
+      - ./api_routes.py:/app/api_routes.py
+      - ./database.py:/app/database.py
+      - ./lnbits_integration.py:/app/lnbits_integration.py
+      - ./nostr_integration.py:/app/nostr_integration.py
+      - ./ml_system.py:/app/ml_system.py
+      - ./sofia_nostr_admin.py:/app/sofia_nostr_admin.py
+      - ./moderation_system.py:/app/moderation_system.py
+      - ./templates:/app/templates
+      - ./static:/app/static
+    networks:
+      - libernet
+      - caddy_network
+
+networks:
+  libernet:
+    external: true
+  caddy_network:
+    external: true

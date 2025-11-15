@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Conta - Sofia</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .register-container {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 12px;
+            padding: 2.5rem;
+            max-width: 450px;
+            width: 100%;
+        }
+        h1 { color: #00ff00; text-align: center; margin-bottom: 0.5rem; font-size: 2rem; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 2rem; }
+        .plan-info {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .plan-info h3 { color: #00ff00; margin-bottom: 0.5rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 1rem;
+        }
+        input:focus { outline: none; border-color: #00ff00; }
+        .btn-submit {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-submit:hover { transform: scale(1.02); }
+        .flash { padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
+        .flash.error { background: rgba(255, 0, 0, 0.2); color: #ff6666; }
+        .flash.success { background: rgba(0, 255, 0, 0.2); color: #66ff66; }
+        .footer-links { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .footer-links a { color: #00ff00; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h1>🤖 Sofia</h1>
+        <p class="subtitle">Criar nova conta</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if plan_info %}
+        <div class="plan-info">
+            <h3>Plano: {{ plan_info.name }}</h3>
+            <p>{{ plan_info.tokens_month|int }} tokens/mês</p>
+            {% if plan_info.price_sats > 0 %}
+            <p>⚡ {{ plan_info.price_sats }} sats</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <form method="POST">
+            <input type="hidden" name="plan" value="{{ plan }}">
+            <div class="form-group">
+                <label for="name">Nome completo</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" required minlength="6">
+            </div>
+            <button type="submit" class="btn-submit">Criar Conta</button>
+        </form>
+
+        <div class="footer-links">
+            <p>Já tem conta? <a href="/login">Fazer login</a></p>
+            <p><a href="/pricing">Ver planos e preços</a></p>
+        </div>
+    </div>
+</body>
+</html>

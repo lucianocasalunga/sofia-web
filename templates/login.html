@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sofia Web - Login</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1d29 100%);
+            padding: 20px;
+        }
+        .auth-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .auth-header h1 {
+            color: #00ff41;
+            font-size: 1.75em;
+            margin: 12px 0 6px;
+        }
+        .auth-header .logo-icon img {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+        }
+        .auth-header p {
+            color: #8b949e;
+            margin: 0;
+        }
+
+        /* Tabs */
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: #0d1117;
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            color: #8b949e;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .auth-tab.active {
+            background: #00ff41;
+            color: #0d1117;
+        }
+        .auth-tab:not(.active):hover {
+            background: #161b22;
+            color: #c9d1d9;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            color: #c9d1d9;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-size: 13px;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #00ff41;
+            box-shadow: 0 0 0 3px rgba(0,255,65,0.1);
+        }
+        .form-helper {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 6px;
+        }
+        .form-helper a {
+            color: #00ff41;
+            text-decoration: none;
+        }
+        .form-helper a:hover {
+            text-decoration: underline;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #00ff41 0%, #00d9ff 100%);
+            border: none;
+            border-radius: 6px;
+            color: #0d1117;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,255,65,0.3);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 24px;
+            color: #8b949e;
+        }
+        .auth-footer a {
+            color: #00ff41;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        .error-message {
+            background: #f851304d;
+            border: 1px solid #f85149;
+            color: #ffa198;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .success-message {
+            background: #238636;
+            border: 1px solid #2ea043;
+            color: #c9d1d9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background: #1f6feb1a;
+            border: 1px solid #1f6feb;
+            color: #79c0ff;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .info-box strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 12px;
+            color: #8b949e;
+        }
+        .loading.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-icon">
+                    <img src="https://media.libernet.app/f/4.png" alt="LiberNet Logo">
+                </div>
+                <h1>Sofia LiberNet</h1>
+                <p>Inteligência descentralizada. Liberdade conectada.</p>
+            </div>
+
+            <div id="messageContainer"></div>
+
+            <!-- Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab" onclick="switchTab('nostr')">
+                    🔑 Nostr
+                </button>
+                <button class="auth-tab" onclick="switchTab('traditional')">
+                    Email/Senha
+                </button>
+            </div>
+
+            <!-- Nostr Login (DEFAULT) -->
+            <div id="nostr-tab" class="tab-content active">
+                <form id="nostr-form" onsubmit="event.preventDefault(); loginWithNostr(); return false;">
+                    <div class="form-group">
+                        <label for="nsec">Nostr Secret Key (nsec)</label>
+                        <textarea id="nsec" name="nsec" placeholder="nsec1..." autocomplete="off"></textarea>
+                        <div class="form-helper">
+                            Não tem chaves Nostr? <a href="https://media.libernet.app/generate-keys" target="_blank">Gere aqui</a>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        Entrar com nsec
+                    </button>
+                    <div style="text-align: center; margin: 16px 0; color: #8b949e; font-size: 13px;">ou</div>
+                    <button type="button" class="btn-primary" onclick="loginWithExtension()" style="background: linear-gradient(135deg, #00d9ff 0%, #00ff41 100%);">
+                        🔑 Entrar com nos2x / Alby
+                    </button>
+                    <div class="loading" id="nostr-loading">
+                        🔄 Autenticando...
+                    </div>
+                </form>
+
+                <div class="auth-footer">
+                    <a href="https://nostr.how" target="_blank">O que é Nostr?</a>
+                </div>
+            </div>
+
+            <!-- Traditional Login -->
+            <div id="traditional-tab" class="tab-content">
+                <form method="POST" action="/login" id="traditional-form">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Senha</label>
+                        <input type="password" id="password" name="password" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn-primary">Entrar</button>
+                </form>
+
+                <div class="auth-footer">
+                    Não tem uma conta? <a href="{{ url_for('register') }}">Criar conta</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Switch between tabs
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+
+            // Clear messages
+            clearMessages();
+        }
+
+        // Show message
+        function showMessage(message, type = 'error') {
+            const container = document.getElementById('messageContainer');
+            const className = type === 'error' ? 'error-message' : 'success-message';
+            container.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+
+        function clearMessages() {
+            document.getElementById('messageContainer').innerHTML = '';
+        }
+
+        // Login with nos2x/Alby extension
+        async function loginWithExtension() {
+            if (isSubmitting) return;
+
+            const loadingDiv = document.getElementById('nostr-loading');
+            const submitBtn = document.querySelector('button[onclick="loginWithExtension()"]');
+
+            // Check if extension is available
+            if (!window.nostr) {
+                showMessage('❌ Extensão nos2x/Alby não detectada. Instale a extensão e recarregue a página.', 'error');
+                return;
+            }
+
+            clearMessages();
+            isSubmitting = true;
+            loadingDiv.classList.add('active');
+            submitBtn.disabled = true;
+
+            try {
+                // Get public key from extension
+                const pubkey = await window.nostr.getPublicKey();
+
+                // Convert hex pubkey to npub (using nostr-tools in backend)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+
+                const response = await fetch('/api/login/nostr-extension', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pubkey }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao fazer login');
+                }
+
+                // Debug: verificar dados recebidos
+                console.log('[LOGIN DEBUG Extension] Resposta da API:', data);
+                console.log('[LOGIN DEBUG Extension] User data:', data.user);
+                console.log('[LOGIN DEBUG Extension] User name:', data.user?.name);
+                console.log('[LOGIN DEBUG Extension] User picture:', data.user?.picture);
+
+                // Success!
+                showMessage('✅ Login bem-sucedido! Redirecionando...', 'success');
+
+                // Store token
+                localStorage.setItem('sofia_token', data.token);
+                localStorage.setItem('sofia_npub', data.npub);
+                localStorage.setItem('sofia_user', JSON.stringify(data.user));
+
+                // Debug: verificar o que foi salvo
+                console.log('[LOGIN DEBUG Extension] Salvo no localStorage:', {
+                    token: localStorage.getItem('sofia_token') ? 'exists' : 'missing',
+                    npub: localStorage.getItem('sofia_npub'),
+                    user: localStorage.getItem('sofia_user')
+                });
+
+                // Redirect to chat after 1 second
+                setTimeout(() => {
+                    window.location.href = '/chat';
+                }, 1000);
+
+            } catch (error) {
+                // Tratamento especial para timeout
+                if (error.name === 'AbortError') {
+                    showMessage('⏱️ Login demorou muito. Tente novamente ou use login com nsec.', 'error');
+                } else {
+                    showMessage(error.message, 'error');
+                }
+                isSubmitting = false;
+            } finally {
+                loadingDiv.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Login with Nostr
+        let isSubmitting = false;
+        async function loginWithNostr() {
+            // Prevent multiple submissions
+            if (isSubmitting) {
+                console.log('Login já em andamento, ignorando...');
+                return;
+            }
+
+            const nsec = document.getElementById('nsec').value.trim();
+            const loadingDiv = document.getElementById('nostr-loading');
+            const submitBtn = document.querySelector('#nostr-form .btn-primary');
+
+            // Validate nsec format
+            if (!nsec.startsWith('nsec1') || nsec.length !== 63) {
+                showMessage('nsec inválido. Deve começar com "nsec1" e ter 63 caracteres.', 'error');
+                return;
+            }
+
+            // Clear previous messages
+            clearMessages();
+
+            // Set submitting flag
+            isSubmitting = true;
+
+            // Show loading
+            loadingDiv.classList.add('active');
+            submitBtn.disabled = true;
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+
+                const response = await fetch('/api/login/nostr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nsec }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao fazer login');
+                }
+
+                // Debug: verificar dados recebidos
+                console.log('[LOGIN DEBUG nsec] Resposta da API:', data);
+                console.log('[LOGIN DEBUG nsec] User data:', data.user);
+                console.log('[LOGIN DEBUG nsec] User name:', data.user?.name);
+                console.log('[LOGIN DEBUG nsec] User picture:', data.user?.picture);
+
+                // Success!
+                showMessage('✅ Login bem-sucedido! Redirecionando...', 'success');
+
+                // Store token
+                localStorage.setItem('sofia_token', data.token);
+                localStorage.setItem('sofia_npub', data.npub);
+                localStorage.setItem('sofia_user', JSON.stringify(data.user));
+
+                // Debug: verificar o que foi salvo
+                console.log('[LOGIN DEBUG nsec] Salvo no localStorage:', {
+                    token: localStorage.getItem('sofia_token') ? 'exists' : 'missing',
+                    npub: localStorage.getItem('sofia_npub'),
+                    user: localStorage.getItem('sofia_user')
+                });
+
+                // Clear nsec from form for security
+                document.getElementById('nsec').value = '';
+
+                // Redirect to chat after 1 second
+                setTimeout(() => {
+                    window.location.href = '/chat';
+                }, 1000);
+
+            } catch (error) {
+                // Tratamento especial para timeout
+                if (error.name === 'AbortError') {
+                    showMessage('⏱️ Login demorou muito. Tente novamente.', 'error');
+                } else {
+                    showMessage(error.message, 'error');
+                }
+                // Reset flag on error
+                isSubmitting = false;
+            } finally {
+                loadingDiv.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Traditional form validation
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('traditional-form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const email = document.getElementById('email').value.trim();
+                    const password = document.getElementById('password').value;
+
+                    if (!email || !password) {
+                        e.preventDefault();
+                        showMessage('Por favor, preencha todos os campos.', 'error');
+                    }
+                });
+            }
+
+            // Limpar tokens expirados se houver
+            const token = localStorage.getItem('sofia_token');
+            if (token) {
+                // Apenas verifica se token é válido, mas NÃO redireciona
+                // (previne loop de redirect - sessão Flask já controla acesso)
+                fetch('/api/health', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        // Token expirado, limpar
+                        localStorage.removeItem('sofia_token');
+                        localStorage.removeItem('sofia_npub');
+                        localStorage.removeItem('sofia_user');
+                    }
+                }).catch(() => {
+                    // Erro, limpar tokens
+                    localStorage.removeItem('sofia_token');
+                    localStorage.removeItem('sofia_npub');
+                    localStorage.removeItem('sofia_user');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
