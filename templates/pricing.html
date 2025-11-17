@@ -341,6 +341,49 @@
         .checking-payment {
             animation: pulse 2s infinite;
         }
+
+        /* Starter customizado - Input de tokens */
+        .custom-token-input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1em;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            background: white;
+            color: #333;
+            transition: border-color 0.3s;
+        }
+
+        .custom-token-input:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        /* Botões rápidos */
+        .quick-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.9em;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .quick-btn:hover {
+            background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.3);
+        }
+
+        .quick-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -358,34 +401,61 @@
             <div class="plan-card">
                 <div class="plan-name">Free</div>
                 <div class="plan-description">Teste gratuito com renovação diária</div>
-                <div class="plan-tokens">10k <span>tokens/24h</span></div>
+                <div class="plan-tokens">100k <span>tokens/24h</span></div>
                 <div class="plan-price">
                     <div class="price-sats">🆓 Grátis</div>
-                    <div class="price-usd">Renova a cada 24h</div>
                 </div>
                 <ul class="features">
                     <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
+                    <li>Sofia 5.0 - Mais inteligente</li>
+                    <li>Sofia 5.0+ - Com internet</li>
                 </ul>
                 <button class="btn-select" onclick="openDonationModal()" style="background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);">💝 Fazer Doação</button>
             </div>
 
-            <!-- Starter Plan: 500k tokens -->
+            <!-- Starter Plan: Customizável -->
             <div class="plan-card">
-                <div class="plan-name">Starter</div>
-                <div class="plan-description">Recarga de tokens</div>
-                <div class="plan-tokens">500k <span>tokens</span></div>
+                <div class="plan-name">Starter <span style="font-size: 0.7em; color: #666;">✨ Customizável</span></div>
+                <div class="plan-description">Escolha a quantidade de tokens</div>
+
+                <!-- Input customizado -->
+                <div style="margin: 15px 0;">
+                    <input type="number"
+                           id="starterTokensInput"
+                           class="custom-token-input"
+                           placeholder="Ex: 500000"
+                           min="100000"
+                           max="10000000"
+                           step="50000"
+                           value="500000"
+                           oninput="updateStarterPrice()">
+                    <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
+                        Mín: 100k | Máx: 10M tokens
+                    </div>
+                </div>
+
+                <!-- Botões rápidos -->
+                <div style="display: flex; gap: 5px; margin: 10px 0; flex-wrap: wrap;">
+                    <button class="quick-btn" onclick="setStarterTokens(250000)">250k</button>
+                    <button class="quick-btn" onclick="setStarterTokens(500000)">500k</button>
+                    <button class="quick-btn" onclick="setStarterTokens(750000)">750k</button>
+                    <button class="quick-btn" onclick="setStarterTokens(1000000)">1M</button>
+                </div>
+
+                <!-- Display do preço calculado -->
+                <div class="plan-tokens">
+                    <span id="starterTokensDisplay">500k</span> <span>tokens</span>
+                </div>
                 <div class="plan-price">
                     <div class="price-sats">
-                        <span class="lightning-icon">⚡</span> 3.500 sats
+                        <span class="lightning-icon">⚡</span> <span id="starterSatsDisplay">2.625</span> sats
                     </div>
-                    <div class="price-usd">≈ US$ 1,26</div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 3px;">
+                        ≈ $<span id="starterUsdDisplay">4.00</span> USD
+                    </div>
                 </div>
-                <ul class="features">
-                    <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
-                </ul>
-                <button class="btn-select" onclick="selectPlan('starter', 500000, 3500)">Recarregar</button>
+
+                <button class="btn-select" onclick="selectCustomStarter()">Recarregar</button>
             </div>
 
             <!-- Light Plan: 1M tokens -->
@@ -395,15 +465,13 @@
                 <div class="plan-tokens">1M <span>tokens</span></div>
                 <div class="plan-price">
                     <div class="price-sats">
-                        <span class="lightning-icon">⚡</span> 7.000 sats
+                        <span class="lightning-icon">⚡</span> <span id="lightSatsDisplay">5.250</span> sats
                     </div>
-                    <div class="price-usd">≈ US$ 2,52</div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 3px;">
+                        ≈ $8.00 USD
+                    </div>
                 </div>
-                <ul class="features">
-                    <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
-                </ul>
-                <button class="btn-select" onclick="selectPlan('light', 1000000, 7000)">Recarregar</button>
+                <button class="btn-select" onclick="selectDynamicPlan('light', 1000000, 8.00)">Recarregar</button>
             </div>
 
             <!-- Standard Plan: 2.5M tokens -->
@@ -413,15 +481,13 @@
                 <div class="plan-tokens">2.5M <span>tokens</span></div>
                 <div class="plan-price">
                     <div class="price-sats">
-                        <span class="lightning-icon">⚡</span> 17.500 sats
+                        <span class="lightning-icon">⚡</span> <span id="standardSatsDisplay">13.125</span> sats
                     </div>
-                    <div class="price-usd">≈ US$ 6,30</div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 3px;">
+                        ≈ $20.00 USD
+                    </div>
                 </div>
-                <ul class="features">
-                    <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
-                </ul>
-                <button class="btn-select" onclick="selectPlan('standard', 2500000, 17500)">Recarregar</button>
+                <button class="btn-select" onclick="selectDynamicPlan('standard', 2500000, 20.00)">Recarregar</button>
             </div>
 
             <!-- Pro Plan: 5M tokens -->
@@ -431,15 +497,13 @@
                 <div class="plan-tokens">5M <span>tokens</span></div>
                 <div class="plan-price">
                     <div class="price-sats">
-                        <span class="lightning-icon">⚡</span> 35.000 sats
+                        <span class="lightning-icon">⚡</span> <span id="proSatsDisplay">26.250</span> sats
                     </div>
-                    <div class="price-usd">≈ US$ 12,60</div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 3px;">
+                        ≈ $40.00 USD
+                    </div>
                 </div>
-                <ul class="features">
-                    <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
-                </ul>
-                <button class="btn-select" onclick="selectPlan('pro', 5000000, 35000)">Recarregar</button>
+                <button class="btn-select" onclick="selectDynamicPlan('pro', 5000000, 40.00)">Recarregar</button>
             </div>
 
             <!-- Enterprise Plan: 10M tokens -->
@@ -449,15 +513,13 @@
                 <div class="plan-tokens">10M <span>tokens</span></div>
                 <div class="plan-price">
                     <div class="price-sats">
-                        <span class="lightning-icon">⚡</span> 70.000 sats
+                        <span class="lightning-icon">⚡</span> <span id="enterpriseSatsDisplay">52.500</span> sats
                     </div>
-                    <div class="price-usd">≈ US$ 25,20</div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 3px;">
+                        ≈ $80.00 USD
+                    </div>
                 </div>
-                <ul class="features">
-                    <li>Sofia 4.0 - Mais econômica</li>
-                    <li>Sofia 4.5 - Mais inteligente</li>
-                </ul>
-                <button class="btn-select" onclick="selectPlan('enterprise', 10000000, 70000)">Recarregar</button>
+                <button class="btn-select" onclick="selectDynamicPlan('enterprise', 10000000, 80.00)">Recarregar</button>
             </div>
         </div>
 
@@ -562,6 +624,10 @@
         let checkPaymentInterval = null;
         let currentPaymentHash = null;
 
+        // Preço BTC em USD (atualizado a cada 24h pelo sistema)
+        // Usamos um valor padrão, mas o backend usa o valor real do cache
+        const DEFAULT_BTC_PRICE = 98000; // Valor aproximado atual
+
         function selectPlan(planName, tokens, sats) {
             console.log('selectPlan chamado:', planName, tokens, sats);
 
@@ -607,6 +673,109 @@
                 closeModal();
             });
         }
+
+        // ===== FUNÇÕES STARTER CUSTOMIZADO =====
+
+        // Converte tokens em USD (taxa: $8 por 1M tokens)
+        function tokensToUsd(tokens) {
+            return (tokens / 1000000) * 8.0;
+        }
+
+        // Converte USD em satoshis (baseado no preço BTC)
+        function usdToSats(usd) {
+            const btcAmount = usd / DEFAULT_BTC_PRICE;
+            return Math.ceil(btcAmount * 100000000);
+        }
+
+        // Formata número de tokens (1000000 → "1M")
+        function formatTokens(tokens) {
+            if (tokens >= 1000000) {
+                const millions = tokens / 1000000;
+                return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`;
+            } else if (tokens >= 1000) {
+                const thousands = tokens / 1000;
+                return thousands % 1 === 0 ? `${thousands}k` : `${thousands.toFixed(1)}k`;
+            }
+            return tokens.toString();
+        }
+
+        // Atualiza preço do Starter baseado no input
+        function updateStarterPrice() {
+            const input = document.getElementById('starterTokensInput');
+            const tokens = parseInt(input.value) || 500000;
+
+            // Validar limites
+            if (tokens < 100000) {
+                input.value = 100000;
+                return updateStarterPrice();
+            }
+            if (tokens > 10000000) {
+                input.value = 10000000;
+                return updateStarterPrice();
+            }
+
+            // Calcular preço
+            const usd = tokensToUsd(tokens);
+            const sats = usdToSats(usd);
+
+            // Atualizar displays
+            document.getElementById('starterTokensDisplay').textContent = formatTokens(tokens);
+            document.getElementById('starterSatsDisplay').textContent = sats.toLocaleString('pt-BR');
+            document.getElementById('starterUsdDisplay').textContent = usd.toFixed(2);
+        }
+
+        // Define tokens nos botões rápidos
+        function setStarterTokens(tokens) {
+            document.getElementById('starterTokensInput').value = tokens;
+            updateStarterPrice();
+        }
+
+        // Seleciona plano Starter customizado
+        function selectCustomStarter() {
+            const input = document.getElementById('starterTokensInput');
+            const tokens = parseInt(input.value) || 500000;
+
+            // Validar
+            if (tokens < 100000 || tokens > 10000000) {
+                alert('Quantidade de tokens deve estar entre 100.000 e 10.000.000');
+                return;
+            }
+
+            const usd = tokensToUsd(tokens);
+            const sats = usdToSats(usd);
+
+            // Usar a função selectPlan normal, mas o backend vai usar custom_tokens
+            selectPlan('starter', tokens, sats);
+        }
+
+        // Atualiza preços de todos os cards com base no BTC atual
+        function updateAllPrices() {
+            // Definição dos valores em USD de cada plano
+            const plans = {
+                light: { usd: 8.00, displayId: 'lightSatsDisplay' },
+                standard: { usd: 20.00, displayId: 'standardSatsDisplay' },
+                pro: { usd: 40.00, displayId: 'proSatsDisplay' },
+                enterprise: { usd: 80.00, displayId: 'enterpriseSatsDisplay' }
+            };
+
+            // Atualizar cada plano
+            for (const [planId, config] of Object.entries(plans)) {
+                const sats = usdToSats(config.usd);
+                document.getElementById(config.displayId).textContent = sats.toLocaleString('pt-BR');
+            }
+        }
+
+        // Seleciona plano com cálculo dinâmico de sats
+        function selectDynamicPlan(package_id, tokens, usd_value) {
+            const sats = usdToSats(usd_value);
+            selectPlan(package_id, tokens, sats);
+        }
+
+        // Inicializar preços ao carregar página
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStarterPrice();
+            updateAllPrices();
+        });
 
         function showInvoice(invoice, planName, tokens, sats) {
             // Formatar tokens (ex: 500000 → 500k, 1000000 → 1M)

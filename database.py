@@ -188,6 +188,11 @@ class Database:
             cursor.execute('ALTER TABLE users ADD COLUMN token_balance INTEGER DEFAULT 0')
             print("[DB] Coluna token_balance adicionada à tabela users")
 
+        # Adicionar coluna preferred_model se não existir
+        if 'preferred_model' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN preferred_model TEXT DEFAULT 'gpt-4o-mini'")
+            print("[DB] Coluna preferred_model adicionada à tabela users")
+
         conn.commit()
         conn.close()
 
@@ -470,13 +475,13 @@ class Database:
             cursor.execute('''
             SELECT * FROM chats
             WHERE user_id = ? AND active = 1
-            ORDER BY created_at DESC
+            ORDER BY updated_at DESC
             ''', (user_id,))
         else:
             cursor.execute('''
             SELECT * FROM chats
             WHERE user_id = ?
-            ORDER BY created_at DESC
+            ORDER BY updated_at DESC
             ''', (user_id,))
 
         rows = cursor.fetchall()
@@ -503,6 +508,19 @@ class Database:
         UPDATE chats SET tokens_used = tokens_used + ?
         WHERE id = ?
         ''', (tokens, chat_id))
+
+        conn.commit()
+        conn.close()
+
+    def update_chat_accessed(self, chat_id: int):
+        """Atualiza updated_at quando chat é acessado (para ordenação)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+        UPDATE chats SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        ''', (chat_id,))
 
         conn.commit()
         conn.close()
@@ -917,6 +935,163 @@ class Database:
         finally:
             conn.close()
 
+    def deduct_tokens(self, user_id: int, tokens: int, model_id: str,
+                     chat_id: int = None, input_tokens: int = 0,
+                     output_tokens: int = 0) -> bool:
+        """
+        Deduz tokens do saldo do usuário após uso REAL da OpenAI API
+
+        Args:
+            user_id: ID do usuário
+            tokens: Quantidade REAL de tokens internos a deduzir
+            model_id: ID do modelo usado (gpt-4o-mini, gpt-5, gpt-5-internet)
+            chat_id: ID do chat (opcional, para rastreamento)
+            input_tokens: Tokens de input da OpenAI (para auditoria)
+            output_tokens: Tokens de output da OpenAI (para auditoria)
+
+        Returns:
+            True se deduzido com sucesso, False se saldo insuficiente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Verificar saldo atual
+            cursor.execute('SELECT token_balance FROM users WHERE id = ?', (user_id,))
+            result = cursor.fetchone()
+
+            if not result:
+                print(f"[DB] ✗ Usuário {user_id} não encontrado")
+                return False
+
+            current_balance = result['token_balance'] or 0
+
+            if current_balance < tokens:
+                print(f"[DB] ✗ Saldo insuficiente: {current_balance} < {tokens}")
+                return False
+
+            # Deduzir tokens
+            cursor.execute('''
+                UPDATE users
+                SET token_balance = token_balance - ?
+                WHERE id = ?
+            ''', (tokens, user_id))
+
+            # Registrar transação detalhada
+            model_names = {
+                'gpt-4o-mini': 'Sofia Mini ⚡',
+                'gpt-5': 'Sofia 5.0 💎',
+                'gpt-5-internet': 'Sofia 5.0+ 🌐'
+            }
+            model_name = model_names.get(model_id, model_id)
+
+            description = f"Uso de {model_name}"
+            if chat_id:
+                description += f" (Chat #{chat_id})"
+            if input_tokens and output_tokens:
+                description += f" - {input_tokens}→{output_tokens} tokens OpenAI"
+
+            cursor.execute('''
+                INSERT INTO token_transactions
+                (user_id, amount, transaction_type, plan_name, description)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (user_id, -tokens, 'usage', model_id, description))
+
+            conn.commit()
+            new_balance = current_balance - tokens
+            print(f"[DB] ✓ {tokens:,} tokens deduzidos do usuário {user_id} "
+                  f"({model_name}, saldo: {new_balance:,})")
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            print(f"[DB] ✗ Erro ao deduzir tokens: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def check_sufficient_balance(self, user_id: int, model_id: str) -> Dict:
+        """
+        Verifica se usuário tem saldo suficiente para usar um modelo
+
+        Args:
+            user_id: ID do usuário
+            model_id: ID do modelo (gpt-4o-mini, gpt-5, gpt-5-internet)
+
+        Returns:
+            Dict com: sufficient (bool), balance (int), estimated_cost (int),
+                     shortage (int), messages_remaining (int)
+        """
+        from pricing_config import TOKEN_USAGE_PER_MESSAGE
+
+        balance = self.get_user_balance(user_id)
+        estimated_cost = TOKEN_USAGE_PER_MESSAGE.get(model_id, 0)
+
+        return {
+            'sufficient': balance >= estimated_cost,
+            'balance': balance,
+            'estimated_cost': estimated_cost,
+            'shortage': max(0, estimated_cost - balance),
+            'messages_remaining': int(balance / estimated_cost) if estimated_cost > 0 else 0
+        }
+
+    def set_preferred_model(self, user_id: int, model_id: str) -> bool:
+        """
+        Define modelo preferido do usuário
+
+        Args:
+            user_id: ID do usuário
+            model_id: ID do modelo
+
+        Returns:
+            True se atualizado com sucesso
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE users
+                SET preferred_model = ?
+                WHERE id = ?
+            ''', (model_id, user_id))
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"[DB] Erro ao atualizar modelo preferido: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_preferred_model(self, user_id: int) -> str:
+        """
+        Retorna modelo preferido do usuário
+
+        Args:
+            user_id: ID do usuário
+
+        Returns:
+            ID do modelo preferido (padrão: gpt-4o-mini)
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('SELECT preferred_model FROM users WHERE id = ?', (user_id,))
+            result = cursor.fetchone()
+
+            if result and result['preferred_model']:
+                return result['preferred_model']
+            return 'gpt-4o-mini'  # padrão
+
+        except Exception as e:
+            print(f"[DB] Erro ao buscar modelo preferido: {e}")
+            return 'gpt-4o-mini'
+        finally:
+            conn.close()
+
     # ============= MÉTODOS DE PROJETOS/PASTAS =============
 
     def create_project(self, user_id: int, name: str) -> Optional[int]:
@@ -1159,6 +1334,113 @@ class Database:
         except Exception as e:
             print(f"[DB] Erro ao buscar chats do projeto: {e}")
             return []
+        finally:
+            conn.close()
+
+    # ============================================
+    # BTC Exchange Rate Cache (para preços dinâmicos)
+    # ============================================
+
+    def get_btc_price_usd(self) -> float:
+        """
+        Retorna preço do BTC em USD do cache.
+        Se não houver cache ou estiver desatualizado (>24h), retorna None.
+
+        Returns:
+            float: Preço do BTC em USD ou None
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS btc_exchange_rate (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    usd_price REAL NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+
+            cursor.execute('SELECT usd_price, updated_at FROM btc_exchange_rate WHERE id = 1')
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            # Verificar se não está desatualizado (>24h)
+            from datetime import datetime, timedelta
+            updated_at = datetime.fromisoformat(row['updated_at'])
+            now = datetime.now()
+
+            if now - updated_at > timedelta(hours=24):
+                print(f"[DB] Taxa BTC desatualizada ({row['updated_at']}) - precisa atualizar")
+                return None
+
+            return row['usd_price']
+
+        except Exception as e:
+            print(f"[DB] Erro ao buscar taxa BTC: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def update_btc_price_usd(self, usd_price: float) -> bool:
+        """
+        Atualiza preço do BTC em USD no cache.
+
+        Args:
+            usd_price: Preço do BTC em USD
+
+        Returns:
+            bool: True se atualizado com sucesso
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS btc_exchange_rate (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    usd_price REAL NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+
+            cursor.execute('''
+                INSERT OR REPLACE INTO btc_exchange_rate (id, usd_price, updated_at)
+                VALUES (1, ?, CURRENT_TIMESTAMP)
+            ''', (usd_price,))
+
+            conn.commit()
+            print(f"[DB] Taxa BTC atualizada: ${usd_price:,.2f} USD")
+            return True
+
+        except Exception as e:
+            print(f"[DB] Erro ao atualizar taxa BTC: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_btc_last_update(self) -> str:
+        """
+        Retorna timestamp da última atualização da taxa BTC.
+
+        Returns:
+            str: Timestamp ISO ou None
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('SELECT updated_at FROM btc_exchange_rate WHERE id = 1')
+            row = cursor.fetchone()
+            return row['updated_at'] if row else None
+
+        except Exception as e:
+            print(f"[DB] Erro ao buscar última atualização BTC: {e}")
+            return None
         finally:
             conn.close()
 

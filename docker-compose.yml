@@ -14,6 +14,7 @@ services:
       - SOFIA_NOSTR_NSEC=${SOFIA_NOSTR_NSEC}
       - SOFIA_NOSTR_NPUB=${SOFIA_NOSTR_NPUB}
       - NOSTR_RELAY_URL=wss://relay.libernet.app
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
     volumes:
       - /opt/memoria_sofia.md:/opt/memoria_sofia.md
       - ./logs:/app/logs
@@ -26,6 +27,9 @@ services:
       - ./ml_system.py:/app/ml_system.py
       - ./sofia_nostr_admin.py:/app/sofia_nostr_admin.py
       - ./moderation_system.py:/app/moderation_system.py
+      - ./internet_tools.py:/app/internet_tools.py
+      - ./billing.py:/app/billing.py
+      - ./pricing_config.py:/app/pricing_config.py
       - ./templates:/app/templates
       - ./static:/app/static
     networks:

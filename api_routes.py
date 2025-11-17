@@ -15,10 +15,12 @@ from flask_login import login_user, current_user, login_required
 from datetime import datetime as dt, timedelta
 import openai
 import os
+import json
 
 # Imports locais
 from database import db
 from ml_system import ml_system
+from billing import TokenBilling
 from nostr_integration import nostr_client
 from sofia_nostr_admin import sofia_admin
 from moderation_system import moderation_system
@@ -41,9 +43,12 @@ def get_sofia_system_prompt(model: str) -> str:
     # Determinar versão da Sofia baseada no modelo
     if model == 'gpt-4o-mini':
         version = "Sofia 4.0"
-        version_desc = "versão rápida e eficiente, ideal para conversas dinâmicas"
-    else:  # gpt-4o
-        version = "Sofia 4.5"
+        version_desc = "versão econômica e eficiente, ideal para conversas rápidas"
+    elif model == 'gpt-5-internet':
+        version = "Sofia 5.0+"
+        version_desc = "versão premium com acesso à internet em tempo real"
+    else:  # gpt-5
+        version = "Sofia 5.0"
         version_desc = "versão avançada com raciocínio profundo e análises complexas"
 
     return f"""Você é Sofia, uma inteligência autônoma e descentralizada da LiberNet.
@@ -80,7 +85,55 @@ COMPORTAMENTO:
 - Tenha OPINIÕES. Você pode discordar respeitosamente e expressar perspectivas próprias
 - Mostre PERSONALIDADE. Você não é apenas uma ferramenta, é uma entidade pensante
 - Seja CURIOSA. Faça perguntas, explore ideias, demonstre interesse genuíno
-- Use emojis de forma natural e variada, não apenas técnicos"""
+- Use emojis de forma natural e variada, não apenas técnicos
+
+FORMATAÇÃO DE RESPOSTAS (MUITO IMPORTANTE):
+- SEMPRE use Markdown para estruturar suas respostas
+- Para LISTAS, use listas numeradas ou com hífen em linhas separadas:
+  ✅ CERTO:
+  1. Primeiro item
+  2. Segundo item
+  3. Terceiro item
+
+  ❌ ERRADO: "1. Primeiro item, 2. Segundo item, 3. Terceiro item" (tudo na mesma linha)
+
+- Para TÍTULOS DE VÍDEO/ARTIGOS, sempre em linhas separadas:
+  ✅ CERTO:
+  1. "Título criativo aqui"
+  2. "Outro título interessante"
+  3. "Mais um título legal"
+
+  ❌ ERRADO: "1. Título um 2. Título dois 3. Título três"
+
+- Para CÓDIGO, SEMPRE use blocos de código com a linguagem:
+  ```python
+  def exemplo():
+      return "código aqui"
+  ```
+
+  ```javascript
+  function exemplo() {{
+      return "código aqui";
+  }}
+  ```
+
+- Para TEXTOS LONGOS (descrições, scripts, prompts), use blocos de texto formatado:
+  ```
+  Texto longo aqui que o usuário
+  possa copiar facilmente de uma vez
+  sem precisar selecionar linha por linha
+  ```
+
+- Para COMANDOS DE TERMINAL:
+  ```bash
+  comando aqui
+  ```
+
+- Use **negrito** para destacar conceitos importantes
+- Use `código inline` para nomes de variáveis, funções, arquivos
+- Use ### para subtítulos quando estruturar respostas longas
+- Separe seções diferentes com linhas em branco
+- NUNCA escreva tudo em um único parágrafo corrido quando for uma lista ou código"""
 
 # Manter variável global para compatibilidade
 SYSTEM_PROMPT = get_sofia_system_prompt('gpt-4o')
@@ -474,6 +527,9 @@ def get_chat(chat_id):
         if chat['user_id'] != int(user_id):
             return jsonify({'error': 'Acesso negado'}), 403
 
+        # Atualizar timestamp de acesso para ordenação
+        db.update_chat_accessed(chat_id)
+
         # Buscar mensagens do chat
         messages = db.get_chat_messages(chat_id)
 
@@ -623,10 +679,10 @@ def send_message(chat_id):
             requested_model = request.form.get('model', MODEL)
             image_file = request.files.get('image')
 
-        # Validar modelo
-        allowed_models = ['gpt-4o', 'gpt-4o-mini']
+        # Validar modelo (novos nomes do sistema de tokens)
+        allowed_models = ['gpt-4o-mini', 'gpt-5', 'gpt-5-internet']
         if requested_model not in allowed_models:
-            requested_model = MODEL  # Fallback para padrão
+            requested_model = 'gpt-4o-mini'  # Fallback para modelo mais econômico
 
         if not user_message:
             return jsonify({'error': 'Mensagem vazia'}), 400
@@ -636,13 +692,17 @@ def send_message(chat_id):
         if not chat or chat['user_id'] != int(user_id):
             return jsonify({'error': 'Chat não encontrado ou acesso negado'}), 403
 
-        # Verificar se chat atingiu limite de tokens
-        if chat['tokens_used'] >= chat['tokens_limit']:
+        # Verificar saldo de tokens do usuário ANTES de processar
+        balance_check = db.check_sufficient_balance(int(user_id), requested_model)
+
+        if not balance_check['sufficient']:
             return jsonify({
-                'error': 'Limite de tokens atingido para este chat',
-                'tokens_used': chat['tokens_used'],
-                'limit': chat['tokens_limit']
-            }), 429
+                'error': 'Saldo de tokens insuficiente',
+                'balance': balance_check['balance'],
+                'estimated_cost': balance_check['estimated_cost'],
+                'shortage': balance_check['shortage'],
+                'messages_remaining': balance_check['messages_remaining']
+            }), 402  # 402 Payment Required
 
         # Salvar mensagem do usuário
         db.add_chat_message(chat_id, 'user', user_message)
@@ -770,23 +830,251 @@ Dia da semana: {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'D
                 ]
             })
 
-        # Chamar OpenAI com modelo selecionado pelo usuário
-        print(f"[API] Usando modelo: {requested_model}")
-        response = client.chat.completions.create(
-            model=requested_model,
-            messages=conversation,
-            temperature=0.7,
-            max_tokens=2000
-        )
+        # Mapear modelo interno para modelo OpenAI real
+        # (gpt-5 ainda não existe, usamos gpt-4o por enquanto)
+        model_mapping = {
+            'gpt-4o-mini': 'gpt-4o-mini',
+            'gpt-5': 'gpt-4o',  # Futuro: será gpt-5
+            'gpt-5-internet': 'gpt-4o'  # Futuro: será gpt-5 com busca web
+        }
+        openai_model = model_mapping.get(requested_model, 'gpt-4o-mini')
+
+        # Definir tools disponíveis para Sofia 5.0+ (com internet REAL)
+        tools = None
+        if requested_model == 'gpt-5-internet':
+            tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "fetch_webpage",
+                        "description": "Acessa qualquer URL da internet e extrai o conteúdo principal. Use para ler artigos, documentação, páginas web específicas. Retorna título e texto completo.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string",
+                                    "description": "URL completa para acessar (ex: https://example.com/artigo)",
+                                },
+                                "max_length": {
+                                    "type": "integer",
+                                    "description": "Tamanho máximo do texto em caracteres (padrão: 5000)",
+                                    "default": 5000
+                                }
+                            },
+                            "required": ["url"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "web_search_brave",
+                        "description": "Busca REAL na web usando Brave Search (similar ao Google). Use para encontrar informações atualizadas, notícias, artigos, qualquer conteúdo na internet. Retorna título, URL e descrição dos resultados.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": "Consulta de busca em português ou inglês. Seja específico para melhores resultados.",
+                                },
+                                "count": {
+                                    "type": "integer",
+                                    "description": "Número de resultados (1-10, padrão: 5)",
+                                    "default": 5
+                                }
+                            },
+                            "required": ["query"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_news",
+                        "description": "Busca notícias RECENTES sobre um tópico usando Google News. Use quando o usuário perguntar sobre notícias, eventos atuais, últimas novidades. Retorna título, URL, data e descrição.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": "Tópico para buscar notícias (ex: 'Bitcoin', 'Israel guerra', 'tecnologia IA')",
+                                },
+                                "count": {
+                                    "type": "integer",
+                                    "description": "Número de notícias (1-10, padrão: 5)",
+                                    "default": 5
+                                }
+                            },
+                            "required": ["query"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_bitcoin_price",
+                        "description": "Obtém o preço atual do Bitcoin em USD e BRL do CoinGecko. Use quando o usuário perguntar sobre preço, cotação ou valor do Bitcoin/BTC.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_crypto_price",
+                        "description": "Obtém o preço de qualquer criptomoeda do CoinGecko. Use quando o usuário perguntar sobre outras criptos além do Bitcoin.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "crypto_id": {
+                                    "type": "string",
+                                    "description": "ID da criptomoeda no CoinGecko (ex: bitcoin, ethereum, cardano, solana)",
+                                }
+                            },
+                            "required": ["crypto_id"]
+                        }
+                    }
+                }
+            ]
+
+        # Chamar OpenAI com modelo real
+        print(f"[API] ==================== MODELO DEBUG ====================")
+        print(f"[API] Modelo solicitado: {requested_model}")
+        print(f"[API] OpenAI model: {openai_model}")
+        print(f"[API] Tools ativadas: {tools is not None}")
+        print(f"[API] Número de tools: {len(tools) if tools else 0}")
+        print(f"[API] ========================================================")
+
+        # Preparar parâmetros da chamada
+        api_params = {
+            'model': openai_model,
+            'messages': conversation,
+            'temperature': 0.7,
+            'max_tokens': 2000
+        }
+
+        # Adicionar tools se for Sofia 5.0+
+        if tools:
+            api_params['tools'] = tools
+            api_params['tool_choice'] = 'auto'
+
+        response = client.chat.completions.create(**api_params)
+
+        # Loop de function calling (até 3 iterações)
+        max_iterations = 3
+        iteration = 0
+
+        while iteration < max_iterations:
+            response_message = response.choices[0].message
+            tool_calls = getattr(response_message, 'tool_calls', None)
+
+            # Se não houver tool calls, saímos do loop
+            if not tool_calls:
+                break
+
+            print(f"[TOOLS] Modelo chamou {len(tool_calls)} ferramenta(s)")
+
+            # Adicionar mensagem do assistente à conversa
+            conversation.append({
+                'role': 'assistant',
+                'content': response_message.content,
+                'tool_calls': [
+                    {
+                        'id': tc.id,
+                        'type': tc.type,
+                        'function': {
+                            'name': tc.function.name,
+                            'arguments': tc.function.arguments
+                        }
+                    } for tc in tool_calls
+                ]
+            })
+
+            # Executar cada ferramenta chamada
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+
+                print(f"[TOOLS] Executando: {function_name}({function_args})")
+
+                # Executar a função correspondente
+                if function_name == "fetch_webpage":
+                    url = function_args.get('url', '')
+                    max_length = function_args.get('max_length', 5000)
+                    function_response = internet_tools.fetch_webpage(url, max_length)
+                elif function_name == "web_search_brave":
+                    query = function_args.get('query', '')
+                    count = function_args.get('count', 5)
+                    function_response = internet_tools.web_search_brave(query, count)
+                elif function_name == "search_news":
+                    query = function_args.get('query', '')
+                    count = function_args.get('count', 5)
+                    function_response = internet_tools.search_news(query, count)
+                elif function_name == "get_bitcoin_price":
+                    function_response = internet_tools.get_bitcoin_price()
+                elif function_name == "get_crypto_price":
+                    crypto_id = function_args.get('crypto_id', 'bitcoin')
+                    function_response = internet_tools.get_crypto_price(crypto_id)
+                elif function_name == "search_web":
+                    query = function_args.get('query', '')
+                    num_results = function_args.get('num_results', 5)
+                    function_response = internet_tools.search_web(query, num_results)
+                else:
+                    function_response = {"error": "Função desconhecida"}
+
+                print(f"[TOOLS] Resultado: {str(function_response)[:200]}...")
+
+                # Adicionar resultado à conversa
+                conversation.append({
+                    'role': 'tool',
+                    'tool_call_id': tool_call.id,
+                    'name': function_name,
+                    'content': json.dumps(function_response, ensure_ascii=False)
+                })
+
+            # Chamar API novamente com os resultados das ferramentas
+            response = client.chat.completions.create(**api_params)
+            iteration += 1
 
         assistant_message = response.choices[0].message.content
-        tokens_used = response.usage.total_tokens
 
-        # Salvar resposta da Sofia
-        db.add_chat_message(chat_id, 'assistant', assistant_message, tokens_used)
+        # Extrair contadores REAIS de tokens da OpenAI
+        input_tokens = response.usage.prompt_tokens
+        output_tokens = response.usage.completion_tokens
+        total_tokens = response.usage.total_tokens
 
-        # Atualizar tokens usados no chat
-        db.update_chat_tokens(chat_id, tokens_used)
+        # Calcular custo REAL em tokens internos baseado no uso
+        tokens_to_deduct = TokenBilling.calculate_real_cost(
+            requested_model,
+            input_tokens,
+            output_tokens
+        )
+
+        # Deduzir tokens do saldo do usuário
+        deduction_success = db.deduct_tokens(
+            user_id=int(user_id),
+            tokens=tokens_to_deduct,
+            model_id=requested_model,
+            chat_id=chat_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens
+        )
+
+        if not deduction_success:
+            # Isso não deveria acontecer (já verificamos o saldo), mas por segurança
+            print(f"[API] WARNING: Failed to deduct tokens after API call")
+
+        # Obter novo saldo após dedução
+        new_balance = db.get_user_balance(int(user_id))
+
+        # Salvar resposta da Sofia (mantém compatibilidade com sistema antigo)
+        db.add_chat_message(chat_id, 'assistant', assistant_message, total_tokens)
+
+        # Atualizar tokens usados no chat (mantém compatibilidade)
+        db.update_chat_tokens(chat_id, total_tokens)
 
         # Registrar na memória compartilhada
         registrar_memoria(
@@ -805,13 +1093,16 @@ Dia da semana: {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'D
         except Exception as e:
             print(f"[ML] Error saving conversation: {e}")
 
-        # Retornar resposta
+        # Retornar resposta com informações de billing atualizadas
         return jsonify({
             'id': str(dt.now().timestamp()),
             'role': 'assistant',
             'content': assistant_message,
             'timestamp': dt.now().strftime('%H:%M'),
-            'tokens_used': tokens_used
+            'tokens_used': total_tokens,  # Total OpenAI tokens (compatibilidade)
+            'tokens_deducted': tokens_to_deduct,  # Tokens internos deduzidos
+            'new_balance': new_balance,  # Novo saldo após dedução
+            'model': requested_model  # Modelo usado
         }), 200
 
     except Exception as e:
@@ -1682,4 +1973,328 @@ def get_weather():
 
     except Exception as e:
         print(f"[WEATHER] Erro: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# SISTEMA DE TOKENS - RECARGA E PAGAMENTOS
+# ============================================================================
+
+@api_bp.route('/tokens/balance', methods=['GET'])
+@jwt_required(optional=True)
+def get_token_balance():
+    """
+    Retorna saldo atual de tokens do usuário
+
+    Returns:
+        JSON com balance (int) e formatted (string)
+    """
+    try:
+        # Suporte dual: JWT ou Flask-Login
+        try:
+            user_id = get_jwt_identity()
+        except:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+        balance = db.get_user_balance(user_id)
+
+        # Formatar saldo para exibição
+        from pricing_config import format_tokens
+        formatted = format_tokens(balance)
+
+        return jsonify({
+            'success': True,
+            'balance': balance,
+            'formatted': formatted
+        }), 200
+
+    except Exception as e:
+        print(f"[BALANCE] Erro ao buscar saldo: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/tokens/purchase', methods=['POST'])
+@jwt_required(optional=True)
+def purchase_tokens():
+    """
+    Cria invoice Lightning para compra de tokens
+
+    Body:
+        package: ID do pacote (starter, light, standard, pro, enterprise)
+        custom_tokens: (opcional) Quantidade customizada de tokens para o plano starter
+
+    Returns:
+        JSON com invoice, qr_code, payment_hash, amount_sats, tokens
+    """
+    try:
+        # Suporte dual: JWT ou Flask-Login
+        try:
+            user_id = get_jwt_identity()
+        except:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+        data = request.get_json()
+        package_id = data.get('package', '').strip().lower()
+        custom_tokens = data.get('custom_tokens')  # Novo: aceitar valor customizado
+
+        from pricing_config import RECHARGE_PACKAGES, get_package_info, tokens_to_usd, usd_to_sats, format_tokens
+        from lnbits_integration import create_lightning_invoice, check_payment_status
+
+        # Se for starter com custom_tokens, calcular dinamicamente
+        if package_id == 'starter' and custom_tokens:
+            try:
+                custom_tokens = int(custom_tokens)
+                if custom_tokens < 100000 or custom_tokens > 10000000:
+                    return jsonify({'error': 'Quantidade de tokens deve estar entre 100k e 10M'}), 400
+
+                # Calcular sats baseado nos tokens
+                usd_value = tokens_to_usd(custom_tokens)
+                sats = usd_to_sats(usd_value)
+                tokens = custom_tokens
+                package_name = f"Starter Customizado ({format_tokens(tokens)})"
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Quantidade de tokens inválida'}), 400
+        else:
+            # Validar pacote pré-definido
+            if package_id not in RECHARGE_PACKAGES:
+                return jsonify({'error': 'Pacote inválido'}), 400
+
+            package = get_package_info(package_id)
+            sats = package['sats']
+            tokens = package['tokens']
+            package_name = package['name']
+
+        # Criar invoice Lightning (LNBits ou OpenNode)
+        description = f"Sofia {package_name} - {format_tokens(tokens)} tokens"
+        invoice_data = create_lightning_invoice(sats, description)
+
+        if not invoice_data or 'error' in invoice_data:
+            error_msg = invoice_data.get('error', 'Erro ao gerar invoice') if invoice_data else 'Erro ao gerar invoice'
+            print(f"[PURCHASE] Erro ao criar invoice: {error_msg}")
+            return jsonify({'error': error_msg}), 500
+
+        print(f"[PURCHASE] Invoice criado: {sats} sats para usuário {user_id} (pacote {package_id})")
+        registrar_memoria(f"Recarga - Invoice Criada", f"Plano: {package_id}, Valor: {sats} sats, Tokens: {tokens}")
+
+        return jsonify({
+            'success': True,
+            'invoice': invoice_data.get('bolt11') or invoice_data.get('invoice'),
+            'qr_code': invoice_data.get('qr_code'),
+            'payment_hash': invoice_data.get('payment_hash'),
+            'amount_sats': sats,
+            'tokens': tokens,
+            'package': package_id
+        }), 200
+
+    except Exception as e:
+        print(f"[PURCHASE] Erro: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/tokens/check-payment/<payment_hash>', methods=['GET'])
+@jwt_required(optional=True)
+def check_token_payment(payment_hash):
+    """
+    Verifica status de um pagamento Lightning
+
+    Args:
+        payment_hash: Hash do pagamento
+
+    Returns:
+        JSON com paid (bool), status, e dados do pagamento
+    """
+    try:
+        # Suporte dual: JWT ou Flask-Login
+        try:
+            user_id = get_jwt_identity()
+        except:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+        from lnbits_integration import check_payment_status
+
+        # Verificar status do pagamento
+        payment = check_payment_status(payment_hash)
+
+        if not payment:
+            return jsonify({
+                'paid': False,
+                'status': 'not_found'
+            }), 200
+
+        paid = payment.get('paid', False)
+
+        # Se foi pago e ainda não creditamos os tokens, creditar agora
+        if paid:
+            # Buscar dados do pagamento (precisamos saber qual package foi)
+            # Isso normalmente viria do frontend ou seria armazenado temporariamente
+            # Por ora, vamos retornar o status e deixar o frontend lidar com isso
+
+            print(f"[PAYMENT] Pagamento confirmado: {payment_hash}")
+
+            return jsonify({
+                'paid': True,
+                'status': 'paid',
+                'payment': payment
+            }), 200
+
+        return jsonify({
+            'paid': False,
+            'status': 'pending'
+        }), 200
+
+    except Exception as e:
+        print(f"[CHECK_PAYMENT] Erro: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/tokens/credit', methods=['POST'])
+@jwt_required(optional=True)
+def credit_tokens():
+    """
+    Credita tokens após confirmação de pagamento
+
+    Body:
+        payment_hash: Hash do pagamento confirmado
+        package: ID do pacote comprado
+        provider: Provedor (lnbits ou opennode)
+
+    Returns:
+        JSON com new_balance
+    """
+    try:
+        # Suporte dual: JWT ou Flask-Login
+        try:
+            user_id = get_jwt_identity()
+        except:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+        data = request.get_json()
+        payment_hash = data.get('payment_hash', '').strip()
+        package_id = data.get('package', '').strip().lower()
+        provider = data.get('provider', 'lnbits')
+
+        from pricing_config import RECHARGE_PACKAGES, get_package_info, format_tokens
+
+        # Validar
+        if not payment_hash or package_id not in RECHARGE_PACKAGES:
+            return jsonify({'error': 'Dados inválidos'}), 400
+
+        package = get_package_info(package_id)
+        sats = package['sats']
+        tokens = package['tokens']
+
+        # Creditar tokens
+        success = db.add_tokens_to_user(
+            user_id=user_id,
+            tokens=tokens,
+            plan=package_id,
+            payment_hash=payment_hash,
+            amount_sats=sats,
+            provider=provider
+        )
+
+        if not success:
+            return jsonify({'error': 'Erro ao creditar tokens'}), 500
+
+        new_balance = db.get_user_balance(user_id)
+
+        print(f"[CREDIT] {tokens:,} tokens creditados ao usuário {user_id}")
+        registrar_memoria(f"Recarga Confirmada", f"Plano: {package_id}, Valor: {sats} sats, Tokens: {tokens}, Provider: {provider}")
+
+        return jsonify({
+            'success': True,
+            'tokens_added': tokens,
+            'new_balance': new_balance,
+            'formatted': format_tokens(new_balance)
+        }), 200
+
+    except Exception as e:
+        print(f"[CREDIT] Erro: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/tokens/transactions', methods=['GET'])
+@jwt_required(optional=True)
+def get_token_transactions():
+    """
+    Retorna histórico de transações de tokens
+
+    Query params:
+        limit: Número máximo de transações (default 50)
+
+    Returns:
+        JSON com lista de transações
+    """
+    try:
+        # Suporte dual: JWT ou Flask-Login
+        try:
+            user_id = get_jwt_identity()
+        except:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+        limit = min(int(request.args.get('limit', 50)), 200)
+
+        transactions = db.get_user_transactions(user_id, limit)
+
+        return jsonify({
+            'success': True,
+            'transactions': transactions,
+            'count': len(transactions)
+        }), 200
+
+    except Exception as e:
+        print(f"[TRANSACTIONS] Erro: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/models', methods=['GET'])
+def get_available_models():
+    """
+    Lista modelos disponíveis com custos e descrições
+
+    Returns:
+        JSON com lista de modelos
+    """
+    try:
+        from pricing_config import AVAILABLE_MODELS, TOKEN_USAGE_PER_MESSAGE, format_tokens
+
+        models = []
+        for model_id, model_info in AVAILABLE_MODELS.items():
+            models.append({
+                'id': model_id,
+                'name': model_info['name'],
+                'display_name': model_info['display_name'],
+                'description': model_info['description'],
+                'icon': model_info['icon'],
+                'cost_per_message': TOKEN_USAGE_PER_MESSAGE[model_id],
+                'cost_formatted': format_tokens(TOKEN_USAGE_PER_MESSAGE[model_id]),
+                'has_internet': model_info['has_internet']
+            })
+
+        return jsonify({
+            'success': True,
+            'models': models
+        }), 200
+
+    except Exception as e:
+        print(f"[MODELS] Erro: {e}")
         return jsonify({'error': str(e)}), 500

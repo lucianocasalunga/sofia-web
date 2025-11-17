@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <!-- Version: 2025-11-15 10:55 - Fixed chatId being null after closeContextMenu -->
+    <!-- Version: 2025-11-16 12:15 - FIX: Ícone Sofia no topo (não na lateral) para aproveitar espaço -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+    <!-- iOS: Prevenir zoom e comportamento do teclado -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Sofia - Chat</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -116,8 +119,8 @@
         }
 
         .menu-btn {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 8px;
             border: none;
             background: transparent;
@@ -127,10 +130,16 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            padding: 0;
         }
 
         .menu-btn:active {
             background: var(--hover-bg);
+        }
+
+        .menu-btn svg {
+            width: 22px;
+            height: 22px;
         }
 
         .chat-title-text {
@@ -143,12 +152,12 @@
 
         .header-actions {
             display: flex;
-            gap: 4px;
+            gap: 8px; /* Aumentado de 4px para 8px */
         }
 
         .icon-btn {
-            width: 36px;
-            height: 36px;
+            width: 44px; /* Aumentado de 36px */
+            height: 44px; /* Aumentado de 36px */
             border-radius: 8px;
             border: none;
             background: transparent;
@@ -158,11 +167,17 @@
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
+            padding: 0;
         }
 
         .icon-btn:active {
             background: var(--hover-bg);
             transform: scale(0.95);
+        }
+
+        .icon-btn svg {
+            width: 22px; /* Aumentado de 20px */
+            height: 22px;
         }
 
         .icon-btn-small {
@@ -189,8 +204,12 @@
         .chat-container {
             flex: 1 1 auto;
             padding: 16px;
-            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            /* Padding extra para compensar o input fixo na parte inferior */
+            padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
             /* MOBILE: Scroll natural do body, não overflow interno */
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
         }
 
         .messages {
@@ -290,16 +309,29 @@
             position: relative;
         }
 
+        /* USUÁRIO: Mantém formato de balão */
         .message.user .message-bubble {
             background: var(--user-bubble);
             color: var(--user-text);
             border-bottom-right-radius: 4px;
         }
 
+        /* SOFIA: Largura total, sem balão (estilo Claude) - ÍCONE NO TOPO */
+        .message.sofia {
+            width: 100%;
+            flex-direction: column; /* Ícone em cima, texto embaixo */
+            gap: 8px; /* Espaço entre ícone e texto */
+            align-items: flex-start; /* Alinhar ícone à esquerda */
+        }
+
         .message.sofia .message-bubble {
-            background: var(--sofia-bubble);
+            max-width: 100%;
+            width: 100%;
+            background: transparent;
             color: var(--sofia-text);
-            border-bottom-left-radius: 4px;
+            border-radius: 0;
+            padding: 12px 0; /* Apenas padding vertical, sem lateral (usar espaço total) */
+            text-align: left;
         }
 
         /* Typing Indicator */
@@ -325,7 +357,11 @@
             30% { opacity: 1; transform: scale(1.2); }
         }
 
-        /* Input Area - ÚNICO E FUNCIONAL */
+        /* Input Area - ÚNICO E SEMPRE VISÍVEL (estilo Claude/ChatGPT)
+         * NOTA: PWAs não podem usar inputAccessoryView (apenas apps nativos iOS).
+         * Este input é fixo no bottom e sobe quando o teclado mobile abre.
+         * Z-index: 1000 - Fica ABAIXO da sidebar (1100) quando ela está aberta.
+         */
         .input-area {
             background: var(--bg-primary);
             border-top: 1px solid var(--border-light);
@@ -335,7 +371,44 @@
             bottom: 0;
             left: 0;
             right: 0;
-            z-index: 50;
+            z-index: 1000; /* Abaixo da sidebar (1100) para não cobrir botão Sair */
+            /* Mobile: Garantir que suba com o teclado */
+            will-change: transform;
+            transition: transform 0.2s ease-out;
+            /* iOS: Prevenir zoom quando focar input */
+            -webkit-text-size-adjust: 100%;
+            /* Hardware acceleration para melhor performance */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            /* Smooth scrolling */
+            -webkit-overflow-scrolling: touch;
+            /* DuckDuckGo/Mobile: Prevenir problemas de viewport */
+            contain: layout style paint;
+        }
+
+        /* iOS: Esconder inputs/toolbars extras do teclado */
+        input[type="text"]:not(.message-input):not(.modal-input),
+        input[type="search"]:not(.message-input) {
+            position: absolute;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* iOS: Remover toolbar de formatação do teclado */
+        .message-input::-webkit-input-placeholder { color: var(--text-secondary); }
+        .message-input::-moz-placeholder { color: var(--text-secondary); }
+        .message-input:-ms-input-placeholder { color: var(--text-secondary); }
+
+        /* iOS: Esconder accessory bar (barra de ferramentas acima do teclado) */
+        input, textarea, select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
 
         .input-wrapper {
@@ -360,7 +433,7 @@
             border: none;
             background: transparent;
             color: var(--text-primary);
-            font-size: 15px;
+            font-size: 16px; /* iOS: Evitar zoom automático (mínimo 16px) */
             font-family: inherit;
             outline: none;
             resize: none;
@@ -368,7 +441,12 @@
             min-height: 22px;
             line-height: 22px;
             padding: 6px 0;
+            /* iOS: Remove estilos nativos */
             -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            /* iOS: Prevenir zoom */
+            touch-action: manipulation;
         }
 
         .message-input::placeholder {
@@ -438,6 +516,7 @@
 
         .sidebar.open {
             left: 0;
+            z-index: 1100; /* Acima do input para não cobrir botão Sair */
         }
 
         .sidebar-overlay {
@@ -448,7 +527,7 @@
             right: 0;
             bottom: 0;
             background: rgba(0,0,0,0.5);
-            z-index: 199;
+            z-index: 1099; /* Entre input (1000) e sidebar (1100) quando aberta */
             backdrop-filter: blur(2px);
         }
 
@@ -492,6 +571,8 @@
             flex: 1;
             overflow-y: auto;
             padding: 8px;
+            /* Mobile: Padding para não ser coberto pelo input quando sidebar aberta */
+            padding-bottom: 80px;
         }
 
         .sidebar-btn {
@@ -548,8 +629,8 @@
         }
 
         .chat-item.active {
-            background: var(--accent);
-            color: white;
+            background: rgba(16, 163, 127, 0.25);
+            color: var(--text);
         }
 
         .chat-item-name {
@@ -649,9 +730,19 @@
 
         .sidebar-footer {
             padding: 16px;
+            /* Mobile: Padding extra para não ser coberto pelo input */
+            padding-bottom: max(90px, calc(90px + env(safe-area-inset-bottom)));
             border-top: 1px solid var(--border-light);
             flex-shrink: 0;
             background: var(--sidebar-bg);
+            /* GARANTIR QUE APAREÇA NO MOBILE */
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            /* FORÇAR VISIBILIDADE - sempre no final da sidebar */
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
         }
 
         .user-profile-btn {
@@ -807,6 +898,17 @@
             transform: scale(0.98);
         }
 
+        .modal-btn-danger {
+            background: #ef4444;
+            color: white;
+            font-weight: 600;
+        }
+
+        .modal-btn-danger:active {
+            background: #dc2626;
+            transform: scale(0.98);
+        }
+
         /* Context Menu */
         .context-menu {
             position: fixed;
@@ -903,8 +1005,30 @@
                 padding-left: 8px;
             }
 
-            .message-bubble {
+            /* Desktop: Apenas usuário tem balão limitado */
+            .message.user .message-bubble {
                 max-width: 65%;
+            }
+
+            /* Sofia permanece largura total no desktop também */
+            .message.sofia .message-bubble {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            /* Input área apenas na coluna central, não sobrepondo sidebar */
+            .input-area {
+                left: 280px; /* Largura da sidebar desktop */
+            }
+
+            /* Desktop: Remover padding extra do footer (não precisa) */
+            .sidebar-footer {
+                padding-bottom: max(16px, env(safe-area-inset-bottom));
+            }
+
+            /* Desktop: Remover padding extra do content */
+            .sidebar-content {
+                padding-bottom: 8px;
             }
         }
 
@@ -934,55 +1058,524 @@
             }
         }
 
-        /* Token Balance */
-        .token-badge {
-            padding: 6px 12px;
+        /* Model Selector Dropdown */
+        .model-selector {
+            position: relative;
+            display: inline-block;
+        }
+
+        .model-selector-btn {
+            padding: 8px 12px;
             background: var(--hover-bg);
-            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            transition: all 0.2s;
         }
 
-        /* Model Badge */
-        .model-badge {
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 8px;
+        .model-selector-btn:hover {
+            background: var(--border-light);
+        }
+
+        .model-selector-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 200px;
+            overflow: hidden;
+        }
+
+        .model-selector-dropdown.active {
+            display: block;
+        }
+
+        .model-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .model-option:last-child {
+            border-bottom: none;
+        }
+
+        .model-option:hover {
+            background: var(--hover-bg);
+        }
+
+        .model-option.selected {
             background: var(--accent);
             color: white;
-            transition: all 0.3s;
         }
 
-        .model-toggle.mini .model-badge {
-            background: #6366f1;
+        .model-option-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 2px;
         }
 
-        /* Logout btn */
+        .model-option-desc {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* Recharge Modal */
+        .recharge-packages {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .package-card {
+            padding: 16px;
+            border: 2px solid var(--border-light);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .package-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .package-card.popular {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(16, 163, 127, 0.05), rgba(0, 217, 255, 0.05));
+        }
+
+        .package-card.popular::before {
+            content: 'POPULAR';
+            position: absolute;
+            top: -10px;
+            right: 16px;
+            background: var(--accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .package-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .package-tokens {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .package-price {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .qr-container {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .qr-container img {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Logout btn - SEMPRE VISÍVEL */
         .logout-btn {
             width: 100%;
             padding: 12px;
             border: none;
             background: transparent;
-            color: #ff4444;
-            border: 1px solid #ff4444;
+            color: #ef4444;
+            border: 1px solid #ef4444;
             border-radius: 12px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
-            margin-top: 8px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .logout-btn:active {
-            background: #ff4444;
+            background: #ef4444;
             color: white;
         }
+
+        .logout-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* ===== INDICADOR DE CUSTO ESTIMADO ===== */
+        .cost-estimator {
+            max-width: 768px;
+            margin: 0 auto;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cost-value {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        /* ===== BOTÃO HISTÓRICO NA SIDEBAR ===== */
+        .history-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .history-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* ===== MODAL HISTÓRICO ===== */
+        .transaction-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+
+        .transaction-modal-content {
+            background: var(--bg-primary);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .transaction-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .transaction-modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .transaction-modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .transaction-modal-close:hover {
+            background: var(--bg-secondary);
+        }
+
+        .transaction-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .transaction-item {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .transaction-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .transaction-type {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .transaction-details {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .transaction-amount {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .transaction-amount.positive {
+            color: #10b981;
+        }
+
+        .transaction-amount.negative {
+            color: #ef4444;
+        }
+
+        .transaction-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        /* ===== MARKDOWN RENDERING STYLES ===== */
+        .message-bubble pre {
+            position: relative;
+            background: var(--code-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+
+        .message-bubble code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .message-bubble pre code {
+            display: block;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+
+        .message-bubble :not(pre) > code {
+            background: var(--code-inline-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .copy-button:hover {
+            opacity: 1;
+        }
+
+        .copy-button.copied {
+            background: #10a37f;
+        }
+
+        :root {
+            --code-bg: #f6f8fa;
+            --code-inline-bg: #eff1f3;
+        }
+
+        [data-theme="dark"] {
+            --code-bg: #f6f8fa;
+            --code-inline-bg: #eff1f3;
+        }
+
+        /* Force code blocks to always have dark text on light background */
+        [data-theme="dark"] .message-bubble pre {
+            background: #f6f8fa !important;
+        }
+
+        [data-theme="dark"] .message-bubble pre code,
+        [data-theme="dark"] .message-bubble pre code * {
+            color: #24292e !important;
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .hljs {
+            background: #f6f8fa !important;
+            color: #24292e !important;
+        }
+
+        [data-theme="dark"] .hljs-comment,
+        [data-theme="dark"] .hljs-quote {
+            color: #6a737d !important;
+        }
+
+        [data-theme="dark"] .hljs-keyword,
+        [data-theme="dark"] .hljs-selector-tag,
+        [data-theme="dark"] .hljs-subst {
+            color: #d73a49 !important;
+        }
+
+        [data-theme="dark"] .hljs-number,
+        [data-theme="dark"] .hljs-literal,
+        [data-theme="dark"] .hljs-variable,
+        [data-theme="dark"] .hljs-template-variable,
+        [data-theme="dark"] .hljs-tag .hljs-attr {
+            color: #005cc5 !important;
+        }
+
+        [data-theme="dark"] .hljs-string,
+        [data-theme="dark"] .hljs-doctag {
+            color: #032f62 !important;
+        }
+
+        [data-theme="dark"] .hljs-title,
+        [data-theme="dark"] .hljs-section,
+        [data-theme="dark"] .hljs-selector-id {
+            color: #6f42c1 !important;
+        }
+
+        [data-theme="dark"] .hljs-type,
+        [data-theme="dark"] .hljs-class .hljs-title {
+            color: #005cc5 !important;
+        }
+
+        [data-theme="dark"] .hljs-tag,
+        [data-theme="dark"] .hljs-name,
+        [data-theme="dark"] .hljs-attribute {
+            color: #22863a !important;
+        }
+
+        [data-theme="dark"] .hljs-regexp,
+        [data-theme="dark"] .hljs-link {
+            color: #032f62 !important;
+        }
+
+        [data-theme="dark"] .hljs-symbol,
+        [data-theme="dark"] .hljs-bullet {
+            color: #e36209 !important;
+        }
+
+        [data-theme="dark"] .hljs-built_in,
+        [data-theme="dark"] .hljs-builtin-name {
+            color: #005cc5 !important;
+        }
+
+        [data-theme="dark"] .hljs-meta {
+            color: #005cc5 !important;
+        }
+
+        [data-theme="dark"] .hljs-deletion {
+            background: #ffeef0 !important;
+        }
+
+        [data-theme="dark"] .hljs-addition {
+            background: #f0fff4 !important;
+        }
+
+        [data-theme="dark"] .hljs-emphasis {
+            font-style: italic !important;
+        }
+
+        [data-theme="dark"] .hljs-strong {
+            font-weight: bold !important;
+        }
+
+        .message-bubble ul, .message-bubble ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+
+        .message-bubble li {
+            margin: 4px 0;
+        }
+
+        .message-bubble p {
+            margin: 8px 0;
+        }
+
+        .message-bubble h3 {
+            margin: 12px 0 8px 0;
+            font-size: 1.1em;
+        }
+
+        .message-bubble strong {
+            font-weight: 600;
+        }
     </style>
+
+    <!-- Markdown rendering libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/bash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/json.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/sql.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/html.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" id="hljs-light">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" id="hljs-dark" disabled>
 </head>
 <body>
     <div class="app-container">
@@ -995,6 +1588,11 @@
                 <div class="sidebar-info">
                     <h3>Sofia</h3>
                     <p>IA Descentralizada</p>
+                </div>
+                <!-- Token Counter -->
+                <div class="token-counter" onclick="openRechargeModal()" style="margin-top: 8px; padding: 8px 12px; background: var(--hover-bg); border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--hover-bg)'" title="Clique para recarregar">
+                    <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Tokens</div>
+                    <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);" id="sidebar-tokens">-</div>
                 </div>
             </div>
 
@@ -1032,6 +1630,15 @@
                 <div id="recent-chats"></div>
             </div>
 
+            <!-- Botão Histórico -->
+            <button class="history-btn" onclick="openTransactionHistory()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Histórico de Tokens
+            </button>
+
             <div class="sidebar-footer">
                 <div class="user-profile-btn" onclick="openProfile()">
                     <div class="user-avatar-small" id="user-avatar">U</div>
@@ -1066,12 +1673,6 @@
                     <div class="chat-title-text" id="chat-title">Nova Conversa</div>
                 </div>
                 <div class="header-actions">
-                    <div class="token-badge" id="token-badge" style="display: none;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path>
-                        </svg>
-                        <span id="balance-text">0</span>
-                    </div>
                     <button class="icon-btn" onclick="toggleTheme()" title="Alternar tema" id="theme-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="5"></circle>
@@ -1085,9 +1686,28 @@
                             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                         </svg>
                     </button>
-                    <button class="icon-btn model-toggle" onclick="toggleModel()" title="Alternar modelo" id="model-toggle-btn">
-                        <span id="model-badge" class="model-badge">4.5</span>
-                    </button>
+                    <div class="model-selector">
+                        <button class="model-selector-btn" onclick="toggleModelDropdown()" id="model-selector-btn">
+                            <span id="current-model-text">Sofia 5.0</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="model-selector-dropdown" id="model-dropdown">
+                            <div class="model-option" onclick="selectModel('gpt-4o-mini')" data-model="gpt-4o-mini">
+                                <div class="model-option-title">⚡ Sofia 4.0 (Mini)</div>
+                                <div class="model-option-desc">Rápida e econômica</div>
+                            </div>
+                            <div class="model-option selected" onclick="selectModel('gpt-5')" data-model="gpt-5">
+                                <div class="model-option-title">💎 Sofia 5.0</div>
+                                <div class="model-option-desc">Avançada e inteligente</div>
+                            </div>
+                            <div class="model-option" onclick="selectModel('gpt-5-internet')" data-model="gpt-5-internet">
+                                <div class="model-option-title">🌐 Sofia 5.0+</div>
+                                <div class="model-option-desc">Com acesso à internet</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1107,6 +1727,14 @@
             <!-- Input Area - ÚNICO E FUNCIONAL -->
             <div class="input-area">
                 <div class="input-wrapper">
+                    <button class="attach-btn" onclick="document.getElementById('imageInput').click()" title="Enviar imagem" style="order: 0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                    </button>
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
                     <textarea
                         class="message-input"
                         id="messageInput"
@@ -1116,22 +1744,22 @@
                         autocomplete="off"
                         autocorrect="on"
                         autocapitalize="sentences"
-                        spellcheck="true"></textarea>
-                    <div class="input-actions">
-                        <button class="attach-btn" onclick="document.getElementById('imageInput').click()" title="Enviar imagem">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="16"></line>
-                                <line x1="8" y1="12" x2="16" y2="12"></line>
-                            </svg>
-                        </button>
-                        <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
-                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-                            </svg>
-                        </button>
-                    </div>
+                        spellcheck="true"
+                        style="order: 1;"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()" style="order: 2;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Indicador de Custo Estimado -->
+                <div class="cost-estimator" id="cost-estimator" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v6l4 2"></path>
+                    </svg>
+                    <span>Custo estimado: <span class="cost-value" id="estimated-cost">~0</span> tokens</span>
                 </div>
             </div>
         </div>
@@ -1207,7 +1835,7 @@
             </div>
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="closeConfirmDeleteModal()">Não</button>
-                <button class="modal-btn modal-btn-primary" style="background: var(--danger-color);" onclick="executeDeleteChat()">Sim</button>
+                <button class="modal-btn modal-btn-danger" onclick="executeDeleteChat()">Sim, Excluir</button>
             </div>
         </div>
     </div>
@@ -1255,6 +1883,91 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal Recarga de Tokens -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">⚡ Recarregar Tokens</div>
+            </div>
+            <div class="modal-body">
+                <div class="recharge-packages" id="packages-list" style="display: block;">
+                    <div class="package-card" onclick="purchasePackage('starter', 1750000, 3500)">
+                        <div class="package-title">Starter</div>
+                        <div class="package-tokens">1.75M tokens</div>
+                        <div class="package-price">3.500 sats (~R$ 8)</div>
+                    </div>
+                    <div class="package-card" onclick="purchasePackage('light', 3500000, 7000)">
+                        <div class="package-title">Light</div>
+                        <div class="package-tokens">3.5M tokens</div>
+                        <div class="package-price">7.000 sats (~R$ 16)</div>
+                    </div>
+                    <div class="package-card popular" onclick="purchasePackage('standard', 8750000, 17500)">
+                        <div class="package-title">Standard</div>
+                        <div class="package-tokens">8.75M tokens</div>
+                        <div class="package-price">17.500 sats (~R$ 40)</div>
+                    </div>
+                    <div class="package-card" onclick="purchasePackage('pro', 17500000, 35000)">
+                        <div class="package-title">Pro</div>
+                        <div class="package-tokens">17.5M tokens</div>
+                        <div class="package-price">35.000 sats (~R$ 80)</div>
+                    </div>
+                    <div class="package-card" onclick="purchasePackage('enterprise', 35000000, 70000)">
+                        <div class="package-title">Enterprise</div>
+                        <div class="package-tokens">35M tokens</div>
+                        <div class="package-price">70.000 sats (~R$ 160)</div>
+                    </div>
+                </div>
+                <div class="qr-container" id="qr-container" style="display: none;">
+                    <p style="margin-bottom: 16px; font-weight: 600;">Escaneie o QR Code para pagar</p>
+                    <img id="qr-code" src="" alt="QR Code">
+                    <p style="margin-top: 16px; font-size: 13px; color: var(--text-secondary);">Aguardando pagamento...</p>
+                    <div style="margin-top: 8px;">
+                        <div style="display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; margin: 0 2px; animation: pulse 1.5s infinite;"></div>
+                        <div style="display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; margin: 0 2px; animation: pulse 1.5s infinite 0.2s;"></div>
+                        <div style="display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; margin: 0 2px; animation: pulse 1.5s infinite 0.4s;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="closeRechargeModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Histórico de Transações -->
+    <div class="transaction-modal" id="transaction-modal">
+        <div class="transaction-modal-content">
+            <div class="transaction-modal-header">
+                <div class="transaction-modal-title">📊 Histórico de Tokens</div>
+                <button class="transaction-modal-close" onclick="closeTransactionHistory()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="transaction-modal-body">
+                <div class="transaction-list" id="transaction-list">
+                    <!-- Transações serão carregadas aqui -->
+                    <div class="transaction-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                        <p>Carregando histórico...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+    </style>
 
     <script>
         // ===== AUTH =====
@@ -1331,7 +2044,7 @@
 
         // ===== STATE =====
         let currentChatId = null;
-        let currentModel = localStorage.getItem('model') || 'gpt-4o';
+        let currentModel = localStorage.getItem('selectedModel') || 'gpt-5'; // Sofia 5.0 por padrão
         let chats = [];
         let selectedImage = null;
         let renamingChatId = null;
@@ -1345,27 +2058,6 @@
         function closeSidebar() {
             document.getElementById('sidebar').classList.remove('open');
             document.getElementById('sidebar-overlay').classList.remove('active');
-        }
-
-        function toggleModel() {
-            currentModel = currentModel === 'gpt-4o' ? 'gpt-4o-mini' : 'gpt-4o';
-            localStorage.setItem('model', currentModel);
-            updateModelBadge();
-        }
-
-        function updateModelBadge() {
-            const badge = document.getElementById('model-badge');
-            const button = document.getElementById('model-toggle-btn');
-
-            if (currentModel === 'gpt-4o-mini') {
-                badge.textContent = '4.0';
-                button.classList.add('mini');
-                button.title = 'Usando Sofia 4.0 (mini) - Clique para alternar';
-            } else {
-                badge.textContent = '4.5';
-                button.classList.remove('mini');
-                button.title = 'Usando Sofia 4.5 (full) - Clique para alternar';
-            }
         }
 
         function toggleTheme() {
@@ -1393,14 +2085,28 @@
             const theme = localStorage.getItem('theme') || 'auto';
             const body = document.body;
 
+            // Get highlight.js theme stylesheets
+            const hljsLight = document.getElementById('hljs-light');
+            const hljsDark = document.getElementById('hljs-dark');
+
             if (theme === 'light') {
                 body.classList.add('light-theme');
                 body.classList.remove('dark-theme');
+                // Enable light syntax highlighting
+                if (hljsLight) hljsLight.disabled = false;
+                if (hljsDark) hljsDark.disabled = true;
             } else if (theme === 'dark') {
                 body.classList.add('dark-theme');
                 body.classList.remove('light-theme');
+                // Enable dark syntax highlighting
+                if (hljsLight) hljsLight.disabled = true;
+                if (hljsDark) hljsDark.disabled = false;
             } else {
+                // Auto mode: follow system preference
                 body.classList.remove('light-theme', 'dark-theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (hljsLight) hljsLight.disabled = prefersDark;
+                if (hljsDark) hljsDark.disabled = !prefersDark;
             }
         }
 
@@ -1432,11 +2138,24 @@
                 ? document.getElementById('user-avatar').textContent
                 : '<img src="/static/logo-sofia.png" alt="Sofia">';
 
+            // Para mensagens da Sofia, renderizar markdown
+            // Para mensagens do usuário, manter como texto simples
+            const content = sender === 'sofia' ? renderMarkdown(text) : escapeHtml(text);
+
             msg.innerHTML = `
                 <div class="message-avatar">${avatar}</div>
-                <div class="message-bubble">${escapeHtml(text)}</div>
+                <div class="message-bubble">${content}</div>
             `;
             messagesContainer.appendChild(msg);
+
+            // Adicionar botões de cópia para blocos de código
+            if (sender === 'sofia') {
+                addCopyButtons(msg);
+                // Aplicar syntax highlighting
+                msg.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
 
             // Só faz scroll se não foi pedido para pular
             if (!skipScroll) {
@@ -1448,6 +2167,54 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function renderMarkdown(text) {
+            // Configurar marked.js para parsing seguro
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                sanitize: false, // Não sanitize pois já confiamos na Sofia
+                headerIds: false,
+                mangle: false
+            });
+
+            // Parse markdown para HTML
+            return marked.parse(text);
+        }
+
+        function addCopyButtons(messageElement) {
+            const codeBlocks = messageElement.querySelectorAll('pre');
+            codeBlocks.forEach((pre) => {
+                const button = document.createElement('button');
+                button.className = 'copy-button';
+                button.textContent = 'Copiar';
+                button.onclick = () => copyToClipboard(pre, button);
+                pre.appendChild(button);
+            });
+        }
+
+        async function copyToClipboard(pre, button) {
+            const code = pre.querySelector('code');
+            const text = code ? code.textContent : pre.textContent;
+
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalText = button.textContent;
+                button.textContent = '✓ Copiado!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                console.error('Erro ao copiar:', err);
+                button.textContent = '✗ Erro';
+                setTimeout(() => {
+                    button.textContent = 'Copiar';
+                }, 2000);
+            }
         }
 
         function addTyping() {
@@ -1504,6 +2271,9 @@
                 if (!currentChatId) return;
             }
 
+            // Pegar modelo selecionado atual
+            const modelToUse = localStorage.getItem('selectedModel') || 'gpt-5';
+
             addMessage(text || '📷 Imagem', 'user');
             const imageToSend = selectedImage;
             messageInput.value = '';
@@ -1517,7 +2287,7 @@
                 if (imageToSend) {
                     const formData = new FormData();
                     formData.append('message', text || 'Analise esta imagem');
-                    formData.append('model', currentModel);
+                    formData.append('model', modelToUse);
                     formData.append('image', imageToSend);
                     const headers = getAuthHeaders();
                     delete headers['Content-Type'];
@@ -1531,7 +2301,7 @@
                     response = await fetch(`/api/chats/${currentChatId}/message`, {
                         method: 'POST',
                         headers: getAuthHeaders(),
-                        body: JSON.stringify({ message: text, model: currentModel }),
+                        body: JSON.stringify({ message: text, model: modelToUse }),
                         credentials: 'include'
                     });
                 }
@@ -2216,8 +2986,7 @@
         }
 
         function updateBalance(balance) {
-            const badge = document.getElementById('token-badge');
-            const text = document.getElementById('balance-text');
+            const sidebarTokens = document.getElementById('sidebar-tokens');
 
             let formatted;
             if (balance >= 1000000) {
@@ -2228,8 +2997,366 @@
                 formatted = String(balance);
             }
 
-            text.textContent = formatted;
-            badge.style.display = 'flex';
+            // Atualizar contador na sidebar
+            if (sidebarTokens) {
+                sidebarTokens.textContent = formatted;
+            }
+        }
+
+        // ===== MODEL SELECTOR =====
+        function toggleModelDropdown() {
+            const dropdown = document.getElementById('model-dropdown');
+            if (dropdown) {
+                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            }
+        }
+
+        function selectModel(modelId) {
+            // Salvar modelo selecionado
+            localStorage.setItem('selectedModel', modelId);
+
+            // Atualizar UI
+            const options = document.querySelectorAll('.model-option');
+            options.forEach(opt => opt.classList.remove('selected'));
+
+            const selected = document.querySelector(`[data-model="${modelId}"]`);
+            if (selected) {
+                selected.classList.add('selected');
+
+                // Atualizar texto do botão
+                const title = selected.querySelector('.model-option-title').textContent;
+                document.getElementById('current-model-text').textContent = title;
+            }
+
+            // Recalcular custo estimado com novo modelo
+            estimateTokenCost();
+
+            // Fechar dropdown
+            document.getElementById('model-dropdown').style.display = 'none';
+        }
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('model-dropdown');
+            const selector = document.querySelector('.model-selector');
+
+            if (dropdown && selector && !selector.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // ===== RECHARGE MODAL =====
+        let currentPaymentHash = null;
+        let paymentCheckInterval = null;
+
+        function openRechargeModal() {
+            const modal = document.getElementById('recharge-modal');
+            const packagesList = document.getElementById('packages-list');
+            const qrContainer = document.getElementById('qr-container');
+
+            if (modal) {
+                modal.style.display = 'flex';
+                packagesList.style.display = 'block';
+                qrContainer.style.display = 'none';
+
+                // Limpar polling anterior se existir
+                if (paymentCheckInterval) {
+                    clearInterval(paymentCheckInterval);
+                    paymentCheckInterval = null;
+                }
+            }
+        }
+
+        function closeRechargeModal() {
+            const modal = document.getElementById('recharge-modal');
+            if (modal) {
+                modal.style.display = 'none';
+
+                // Limpar polling
+                if (paymentCheckInterval) {
+                    clearInterval(paymentCheckInterval);
+                    paymentCheckInterval = null;
+                }
+                currentPaymentHash = null;
+            }
+        }
+
+        // Fechar modal ao clicar no overlay
+        const rechargeModal = document.getElementById('recharge-modal');
+        if (rechargeModal) {
+            rechargeModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeRechargeModal();
+                }
+            });
+        }
+
+        async function purchasePackage(packageName, tokens, sats) {
+            try {
+                const headers = getAuthHeaders();
+                if (!headers.Authorization) {
+                    showStatus('Por favor, faça login primeiro', 'error');
+                    return;
+                }
+
+                headers['Content-Type'] = 'application/json';
+
+                const response = await fetch('/api/tokens/purchase', {
+                    method: 'POST',
+                    headers: headers,
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        package: packageName,
+                        tokens: tokens,
+                        sats: sats
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erro ao criar invoice');
+                }
+
+                const data = await response.json();
+
+                // Mostrar QR code
+                document.getElementById('packages-list').style.display = 'none';
+                document.getElementById('qr-container').style.display = 'block';
+                document.getElementById('qr-code').src = data.qr_code;
+
+                currentPaymentHash = data.payment_hash;
+
+                // Iniciar polling para verificar pagamento
+                startPaymentPolling(data.payment_hash, tokens);
+
+            } catch (error) {
+                console.error('Error purchasing package:', error);
+                showStatus('Erro ao criar pagamento: ' + error.message, 'error');
+            }
+        }
+
+        function startPaymentPolling(paymentHash, tokens) {
+            // Verificar a cada 3 segundos
+            paymentCheckInterval = setInterval(async () => {
+                try {
+                    const headers = getAuthHeaders();
+                    const response = await fetch(`/api/tokens/check-payment/${paymentHash}`, {
+                        headers,
+                        credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        if (data.paid) {
+                            // Pagamento confirmado! Creditar tokens
+                            await creditTokens(paymentHash, tokens);
+
+                            // Limpar polling
+                            clearInterval(paymentCheckInterval);
+                            paymentCheckInterval = null;
+
+                            // Fechar modal
+                            closeRechargeModal();
+
+                            // Mostrar mensagem de sucesso
+                            showStatus(`✅ Recarga confirmada! ${formatTokens(tokens)} tokens adicionados`, 'success');
+
+                            // Atualizar saldo
+                            loadBalance();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking payment:', error);
+                }
+            }, 3000);
+        }
+
+        async function creditTokens(paymentHash, tokens) {
+            try {
+                const headers = getAuthHeaders();
+                headers['Content-Type'] = 'application/json';
+
+                const response = await fetch('/api/tokens/credit', {
+                    method: 'POST',
+                    headers: headers,
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        payment_hash: paymentHash,
+                        tokens: tokens
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao creditar tokens');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Error crediting tokens:', error);
+                throw error;
+            }
+        }
+
+        function formatTokens(tokens) {
+            if (tokens >= 1000000) {
+                return (tokens / 1000000).toFixed(1) + 'M';
+            } else if (tokens >= 1000) {
+                return Math.round(tokens / 1000) + 'k';
+            }
+            return tokens.toString();
+        }
+
+        // ===== INDICADOR DE CUSTO ESTIMADO =====
+        let modelCosts = {};
+        let estimatedCost = 0;
+
+        async function loadModelCosts() {
+            try {
+                const response = await fetch('/api/models');
+                if (response.ok) {
+                    const data = await response.json();
+                    data.models.forEach(model => {
+                        modelCosts[model.id] = {
+                            input: model.cost_per_1k_input || 0,
+                            output: model.cost_per_1k_output || 0
+                        };
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading model costs:', error);
+            }
+        }
+
+        function estimateTokenCost() {
+            const input = document.getElementById('messageInput');
+            if (!input) return;
+
+            const text = input.value;
+            if (!text || text.trim().length === 0) {
+                document.getElementById('cost-estimator').style.display = 'none';
+                return;
+            }
+
+            // Estimativa grosseira: 1 token ≈ 4 caracteres
+            const estimatedInputTokens = Math.ceil(text.length / 4);
+            const selectedModel = localStorage.getItem('selectedModel') || 'gpt-5';
+
+            if (modelCosts[selectedModel]) {
+                const costs = modelCosts[selectedModel];
+                // Estimar custo (input + estimativa de output ~150 tokens)
+                const inputCost = (estimatedInputTokens / 1000) * costs.input;
+                const estimatedOutputCost = (150 / 1000) * costs.output;
+                estimatedCost = Math.ceil(inputCost + estimatedOutputCost);
+
+                document.getElementById('estimated-cost').textContent = `~${estimatedCost}`;
+                document.getElementById('cost-estimator').style.display = 'flex';
+            } else {
+                document.getElementById('cost-estimator').style.display = 'none';
+            }
+        }
+
+        // ===== HISTÓRICO DE TRANSAÇÕES =====
+        async function openTransactionHistory() {
+            const modal = document.getElementById('transaction-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+                await loadTransactionHistory();
+            }
+        }
+
+        function closeTransactionHistory() {
+            const modal = document.getElementById('transaction-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        async function loadTransactionHistory() {
+            try {
+                const headers = getAuthHeaders();
+                if (!headers.Authorization) {
+                    document.getElementById('transaction-list').innerHTML = `
+                        <div class="transaction-empty">
+                            <p>Faça login para ver seu histórico</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const response = await fetch('/api/tokens/transactions?limit=50', {
+                    headers,
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar histórico');
+                }
+
+                const data = await response.json();
+                const transactions = data.transactions;
+
+                if (transactions.length === 0) {
+                    document.getElementById('transaction-list').innerHTML = `
+                        <div class="transaction-empty">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 6v6l4 2"></path>
+                            </svg>
+                            <p>Nenhuma transação ainda</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                transactions.forEach(tx => {
+                    const isPositive = tx.type === 'purchase' || tx.amount > 0;
+                    const amountClass = isPositive ? 'positive' : 'negative';
+                    const amountPrefix = isPositive ? '+' : '';
+
+                    const date = new Date(tx.timestamp);
+                    const dateStr = date.toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    let typeText = '';
+                    let detailsText = '';
+
+                    if (tx.type === 'purchase') {
+                        typeText = '💰 Recarga';
+                        detailsText = `${dateStr}`;
+                    } else {
+                        typeText = '💬 Uso';
+                        detailsText = `${tx.model || 'Sofia'} • ${dateStr}`;
+                    }
+
+                    html += `
+                        <div class="transaction-item">
+                            <div class="transaction-info">
+                                <div class="transaction-type">${typeText}</div>
+                                <div class="transaction-details">${detailsText}</div>
+                            </div>
+                            <div class="transaction-amount ${amountClass}">
+                                ${amountPrefix}${formatTokens(Math.abs(tx.amount))}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('transaction-list').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading transaction history:', error);
+                document.getElementById('transaction-list').innerHTML = `
+                    <div class="transaction-empty">
+                        <p>Erro ao carregar histórico</p>
+                    </div>
+                `;
+            }
         }
 
         // ===== NOSTR PROFILE FETCH (ASYNC COM POLLING) =====
@@ -2318,19 +3445,86 @@
             window.location.href = '/login';
         }
 
+        // ===== MOBILE KEYBOARD FIX (DuckDuckGo/Safari/Chrome) =====
+        // Ajusta viewport e input quando teclado mobile abre/fecha
+        function handleKeyboardResize() {
+            const inputArea = document.querySelector('.input-area');
+            const chatContainer = document.querySelector('.chat-container');
+
+            // Detectar se teclado está aberto (viewport height diminui)
+            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const windowHeight = window.innerHeight;
+            const keyboardHeight = windowHeight - viewportHeight;
+
+            if (keyboardHeight > 100) {
+                // Teclado aberto - garantir que input fique visível
+                inputArea.style.bottom = '0';
+                chatContainer.style.paddingBottom = `calc(${keyboardHeight}px + 100px)`;
+            } else {
+                // Teclado fechado - resetar
+                inputArea.style.bottom = '0';
+                chatContainer.style.paddingBottom = 'calc(100px + env(safe-area-inset-bottom, 0px))';
+            }
+
+            // Scroll para última mensagem ao abrir teclado
+            if (keyboardHeight > 100) {
+                setTimeout(() => {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }, 100);
+            }
+        }
+
         // ===== INIT =====
         document.addEventListener('DOMContentLoaded', async function() {
             applyTheme();
-            updateModelBadge();
+
+            // Inicializar seletor de modelo
+            const selectedModel = localStorage.getItem('selectedModel') || 'gpt-5';
+            const modelOption = document.querySelector(`[data-model="${selectedModel}"]`);
+            if (modelOption) {
+                // Marcar como selecionado
+                document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('selected'));
+                modelOption.classList.add('selected');
+
+                // Atualizar texto do botão
+                const title = modelOption.querySelector('.model-option-title').textContent;
+                document.getElementById('current-model-text').textContent = title;
+            }
+
             if (!checkAuth()) return;
             await loadChats();
             await loadProjects(); // Carrega projetos do backend
             await loadBalance();
+            await loadModelCosts(); // Carrega custos dos modelos
 
             // Buscar perfil Nostr de forma assíncrona (não bloqueia UI)
             fetchNostrProfileAsync();
 
-            messageInput.focus();
+            // Event listeners para mobile keyboard (DEPOIS do DOM carregar)
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', handleKeyboardResize);
+                window.visualViewport.addEventListener('scroll', handleKeyboardResize);
+            }
+            window.addEventListener('resize', handleKeyboardResize);
+
+            // Prevenir zoom no DuckDuckGo quando focar input
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                // Event listener para calcular custo estimado
+                messageInput.addEventListener('input', estimateTokenCost);
+
+                messageInput.addEventListener('focus', function(e) {
+                    // Scroll suave até o input
+                    setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 300);
+                });
+
+                // Focus no input (evitar auto-zoom no mobile)
+                if (window.innerWidth > 768) {
+                    messageInput.focus();
+                }
+            }
         });
     </script>
 </body>
