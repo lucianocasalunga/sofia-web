@@ -601,15 +601,21 @@ def rename_chat(chat_id):
 
 
 @api_bp.route('/chats/<int:chat_id>', methods=['DELETE'])
-@jwt_required()
+@jwt_required(optional=True)
 def delete_chat(chat_id):
     """
     Excluir um chat
     DELETE /api/chats/<chat_id>
-    Headers: Authorization: Bearer <token>
+    Headers: Authorization: Bearer <token> (JWT) ou sessão Flask-Login
     """
     try:
+        # Suporte dual authentication: JWT ou Flask-Login
         user_id = get_jwt_identity()
+        if not user_id:
+            if current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                return jsonify({'error': 'Não autenticado'}), 401
 
         # Verificar se chat pertence ao usuário
         chat = db.get_chat(chat_id)
@@ -768,12 +774,13 @@ Dia da semana: {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'D
             embedding = ml_system.get_embedding(user_message)
 
             # Buscar conversas similares (passa query diretamente, não embedding)
-            similar = ml_system.find_similar_conversations(user_message, user_id=int(user_id), limit=3)
+            similar = ml_system.find_similar_conversations(user_message, user_id=int(user_id), chat_id=chat_id, limit=3)
 
             if similar:
                 context = "CONTEXTO DE CONVERSAS ANTERIORES:\n"
                 for conv in similar:
-                    context += f"- {conv['text'][:200]}...\n"
+                    # Use 'message' and 'response' keys from ML system
+                    context += f"- Q: {conv['message'][:100]}... A: {conv['response'][:100]}...\n"
 
                 conversation.append({
                     'role': 'system',
@@ -1086,6 +1093,7 @@ Dia da semana: {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'D
         try:
             ml_system.store_conversation(
                 user_id=int(user_id),
+                chat_id=chat_id,
                 message=user_message,
                 response=assistant_message,
                 context_tags=['chat', 'general']

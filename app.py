@@ -56,7 +56,7 @@ CORS(app,
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-login_manager.session_protection = 'strong'
+login_manager.session_protection = None  # Desabilitado para evitar logout automático em mobile (IP/user agent changes)
 
 # Configurações
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
@@ -590,149 +590,149 @@ def clear_history():
 # ============= ROTAS DE CHATS NOMEADOS =============
 # ROTAS COMENTADAS - USANDO JWT BLUEPRINT em api_routes.py
 
-# @app.route('/api/chats', methods=['GET'])
-# @api_login_required
-# def get_chats():
-#     """Lista todos os chats do usuário"""
-#     chats = db.get_user_chats(current_user.id)
-#
-#     # Se não houver chats, criar um padrão automaticamente
-#     if not chats:
-#         chat_id = db.create_chat(current_user.id, 'Conversa Principal')
-#         if chat_id:
-#             chats = db.get_user_chats(current_user.id)
-#             print(f"[AUTO] Chat padrão criado para {current_user.email}: ID {chat_id}")
-#
-#     return jsonify({'chats': chats})
-#
-#
-# @app.route('/api/chats', methods=['POST'])
-# @api_login_required
-# def create_chat():
-#     """Cria um novo chat nomeado"""
-#     data = request.json
-#     chat_name = data.get('name', '').strip()
-#
-#     if not chat_name:
-#         return jsonify({'error': 'Nome do chat é obrigatório'}), 400
-#
-#     chat_id = db.create_chat(current_user.id, chat_name)
-#
-#     if chat_id:
-#         registrar_memoria(f"Chat criado - {current_user.email}", f"Nome: {chat_name}, ID: {chat_id}")
-#         return jsonify({
-#             'success': True,
-#             'chat_id': chat_id,
-#             'message': f'Chat "{chat_name}" criado com sucesso'
-#         })
-#     else:
-#         return jsonify({'error': 'Erro ao criar chat'}), 500
-#
-#
-# @app.route('/api/chats/<int:chat_id>', methods=['GET'])
-# @api_login_required
-# def get_chat_details(chat_id):
-#     """Retorna detalhes e mensagens de um chat"""
-#     chat = db.get_chat(chat_id)
-#
-#     if not chat or chat['user_id'] != current_user.id:
-#         return jsonify({'error': 'Chat não encontrado'}), 404
-#
-#     messages = db.get_chat_messages(chat_id)
-#     limit_status = db.check_chat_limit(chat_id)
-#
-#     return jsonify({
-#         'chat': chat,
-#         'messages': messages,
-#         'limit_status': limit_status
-#     })
-#
-#
-# @app.route('/api/chats/<int:chat_id>/message', methods=['POST'])
-# @api_login_required
-# def send_chat_message(chat_id):
-#     """Envia mensagem para um chat específico"""
-#     try:
-#         chat = db.get_chat(chat_id)
-#
-#         if not chat or chat['user_id'] != current_user.id:
-#             return jsonify({'error': 'Chat não encontrado'}), 404
-#
-#         if not chat['active']:
-#             return jsonify({'error': 'Chat inativo'}), 403
-#
-#         data = request.json
-#         mensagem_usuario = data.get('message', '')
-#
-#         if not mensagem_usuario:
-#             return jsonify({'error': 'Mensagem vazia'}), 400
-#
-#         # Verificar limite do chat
-#         estimated_tokens = len(mensagem_usuario) // 4 + 50
-#
-#         if not db.can_chat_use_tokens(chat_id, estimated_tokens):
-#             return jsonify({
-#                 'error': 'Limite de tokens do chat atingido',
-#                 'limit_reached': True,
-#                 'message': f'O chat "{chat["chat_name"]}" atingiu o limite de tokens. Ele será deletado em 7 dias.'
-#             }), 403
-#
-#         # Buscar histórico do chat
-#         chat_messages = db.get_chat_messages(chat_id, limit=20)
-#
-#         # Preparar mensagens para a API
-#         messages = [
-#             {"role": "system", "content": SYSTEM_PROMPT}
-#         ]
-#
-#         # Adicionar histórico do chat
-#         for msg in chat_messages:
-#             messages.append({
-#                 "role": msg['role'],
-#                 "content": msg['content']
-#             })
-#
-#         # Adicionar mensagem atual
-#         messages.append({"role": "user", "content": mensagem_usuario})
-#
-#         # Chamar API OpenAI
-#         response = client.chat.completions.create(
-#             model=MODEL,
-#             messages=messages,
-#             temperature=0.7,
-#             max_tokens=2000
-#         )
-#
-#         resposta_sofia = response.choices[0].message.content
-#         tokens_used = response.usage.total_tokens if hasattr(response, 'usage') else estimated_tokens
-#
-#         # Salvar mensagens no banco
-#         db.add_chat_message(chat_id, 'user', mensagem_usuario, tokens_used // 2)
-#         db.add_chat_message(chat_id, 'assistant', resposta_sofia, tokens_used // 2)
-#
-#         # Atualizar tokens do chat
-#         db.update_chat_tokens(chat_id, tokens_used)
-#
-#         # Atualizar tokens do usuário também
-#         db.update_tokens_used(current_user.id, tokens_used)
-#         db.log_usage(current_user.id, tokens_used, MODEL, mensagem_usuario, resposta_sofia)
-#
-#         # Registrar na memória
-#         registrar_memoria(f"{current_user.email} (Chat: {chat['chat_name']})", mensagem_usuario)
-#         registrar_memoria("Sofia (Web)", resposta_sofia)
-#
-#         # Verificar limite do chat
-#         limit_status = db.check_chat_limit(chat_id)
-#
-#         return jsonify({
-#             'response': resposta_sofia,
-#             'timestamp': datetime.now().strftime('%H:%M:%S'),
-#             'tokens_used': tokens_used,
-#             'limit_status': limit_status
-#         })
-#
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+@app.route('/api/chats', methods=['GET'])
+@api_login_required
+def get_chats():
+    """Lista todos os chats do usuário"""
+    chats = db.get_user_chats(current_user.id)
+
+    # Se não houver chats, criar um padrão automaticamente
+    if not chats:
+        chat_id = db.create_chat(current_user.id, 'Conversa Principal')
+        if chat_id:
+            chats = db.get_user_chats(current_user.id)
+            print(f"[AUTO] Chat padrão criado para {current_user.email}: ID {chat_id}")
+
+    return jsonify({'chats': chats})
+
+
+@app.route('/api/chats', methods=['POST'])
+@api_login_required
+def create_chat():
+    """Cria um novo chat nomeado"""
+    data = request.json
+    chat_name = data.get('name', '').strip()
+
+    if not chat_name:
+        return jsonify({'error': 'Nome do chat é obrigatório'}), 400
+
+    chat_id = db.create_chat(current_user.id, chat_name)
+
+    if chat_id:
+        registrar_memoria(f"Chat criado - {current_user.email}", f"Nome: {chat_name}, ID: {chat_id}")
+        return jsonify({
+            'success': True,
+            'chat_id': chat_id,
+            'message': f'Chat "{chat_name}" criado com sucesso'
+        })
+    else:
+        return jsonify({'error': 'Erro ao criar chat'}), 500
+
+
+@app.route('/api/chats/<int:chat_id>', methods=['GET'])
+@api_login_required
+def get_chat_details(chat_id):
+    """Retorna detalhes e mensagens de um chat"""
+    chat = db.get_chat(chat_id)
+
+    if not chat or chat['user_id'] != current_user.id:
+        return jsonify({'error': 'Chat não encontrado'}), 404
+
+    messages = db.get_chat_messages(chat_id)
+    limit_status = db.check_chat_limit(chat_id)
+
+    return jsonify({
+        'chat': chat,
+        'messages': messages,
+        'limit_status': limit_status
+    })
+
+
+@app.route('/api/chats/<int:chat_id>/message', methods=['POST'])
+@api_login_required
+def send_chat_message(chat_id):
+    """Envia mensagem para um chat específico"""
+    try:
+        chat = db.get_chat(chat_id)
+
+        if not chat or chat['user_id'] != current_user.id:
+            return jsonify({'error': 'Chat não encontrado'}), 404
+
+        if not chat['active']:
+            return jsonify({'error': 'Chat inativo'}), 403
+
+        data = request.json
+        mensagem_usuario = data.get('message', '')
+
+        if not mensagem_usuario:
+            return jsonify({'error': 'Mensagem vazia'}), 400
+
+        # Verificar limite do chat
+        estimated_tokens = len(mensagem_usuario) // 4 + 50
+
+        if not db.can_chat_use_tokens(chat_id, estimated_tokens):
+            return jsonify({
+                'error': 'Limite de tokens do chat atingido',
+                'limit_reached': True,
+                'message': f'O chat "{chat["chat_name"]}" atingiu o limite de tokens. Ele será deletado em 7 dias.'
+            }), 403
+
+        # Buscar histórico do chat
+        chat_messages = db.get_chat_messages(chat_id, limit=20)
+
+        # Preparar mensagens para a API
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT}
+        ]
+
+        # Adicionar histórico do chat
+        for msg in chat_messages:
+            messages.append({
+                "role": msg['role'],
+                "content": msg['content']
+            })
+
+        # Adicionar mensagem atual
+        messages.append({"role": "user", "content": mensagem_usuario})
+
+        # Chamar API OpenAI
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        resposta_sofia = response.choices[0].message.content
+        tokens_used = response.usage.total_tokens if hasattr(response, 'usage') else estimated_tokens
+
+        # Salvar mensagens no banco
+        db.add_chat_message(chat_id, 'user', mensagem_usuario, tokens_used // 2)
+        db.add_chat_message(chat_id, 'assistant', resposta_sofia, tokens_used // 2)
+
+        # Atualizar tokens do chat
+        db.update_chat_tokens(chat_id, tokens_used)
+
+        # Atualizar tokens do usuário também
+        db.update_tokens_used(current_user.id, tokens_used)
+        db.log_usage(current_user.id, tokens_used, MODEL, mensagem_usuario, resposta_sofia)
+
+        # Registrar na memória
+        registrar_memoria(f"{current_user.email} (Chat: {chat['chat_name']})", mensagem_usuario)
+        registrar_memoria("Sofia (Web)", resposta_sofia)
+
+        # Verificar limite do chat
+        limit_status = db.check_chat_limit(chat_id)
+
+        return jsonify({
+            'response': resposta_sofia,
+            'timestamp': datetime.now().strftime('%H:%M:%S'),
+            'tokens_used': tokens_used,
+            'limit_status': limit_status
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/chats/<int:chat_id>', methods=['DELETE'])

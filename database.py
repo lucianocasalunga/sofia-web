@@ -16,7 +16,7 @@ DB_PATH = '/app/data/sofia_users.db'
 PLANS = {
     'free': {
         'name': 'Free (teste)',
-        'tokens_month': 100000,  # 100k tokens
+        'tokens_month': 100000,  # 100k tokens (bônus único na primeira vez)
         'price_usd': 0,
         'price_sats': 0,
         'price_brl': 0,
@@ -78,6 +78,7 @@ class Database:
             tokens_limit INTEGER DEFAULT 50,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
+            last_token_reset TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             active BOOLEAN DEFAULT 1
         )
         ''')
@@ -185,13 +186,26 @@ class Database:
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'token_balance' not in columns:
-            cursor.execute('ALTER TABLE users ADD COLUMN token_balance INTEGER DEFAULT 0')
-            print("[DB] Coluna token_balance adicionada à tabela users")
+            cursor.execute('ALTER TABLE users ADD COLUMN token_balance INTEGER DEFAULT 100000')
+            print("[DB] Coluna token_balance adicionada à tabela users com 100k tokens padrão")
+
+        # Corrigir usuários existentes que ficaram com 0 tokens por bug anterior
+        cursor.execute("UPDATE users SET token_balance = 100000 WHERE token_balance = 0 AND plan = 'free'")
+        updated_count = cursor.rowcount
+        if updated_count > 0:
+            print(f"[DB] Corrigidos {updated_count} usuários free que estavam com 0 tokens")
 
         # Adicionar coluna preferred_model se não existir
         if 'preferred_model' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN preferred_model TEXT DEFAULT 'gpt-4o-mini'")
             print("[DB] Coluna preferred_model adicionada à tabela users")
+
+        # Adicionar coluna last_token_reset se não existir (migration para reset diário de tokens free)
+        if 'last_token_reset' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_token_reset TIMESTAMP DEFAULT NULL")
+            # Atualizar usuários existentes com timestamp atual
+            cursor.execute("UPDATE users SET last_token_reset = CURRENT_TIMESTAMP WHERE last_token_reset IS NULL")
+            print("[DB] Coluna last_token_reset adicionada à tabela users")
 
         conn.commit()
         conn.close()
@@ -206,9 +220,9 @@ class Database:
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
             cursor.execute('''
-            INSERT INTO users (email, password_hash, name, role, plan, tokens_limit)
-            VALUES (?, ?, ?, ?, 'free', 50)
-            ''', (email, password_hash, name, role))
+            INSERT INTO users (email, password_hash, name, role, plan, tokens_limit, token_balance)
+            VALUES (?, ?, ?, ?, 'free', ?, ?)
+            ''', (email, password_hash, name, role, PLANS['free']['tokens_month'], PLANS['free']['tokens_month']))
 
             user_id = cursor.lastrowid
             conn.commit()
@@ -281,6 +295,65 @@ class Database:
         cursor.execute('UPDATE users SET tokens_used = 0 WHERE id = ?', (user_id,))
 
         conn.commit()
+        conn.close()
+
+    def check_and_reset_daily_tokens(self, user_id: int):
+        """
+        DESABILITADO: Tokens gratuitos são dados UMA VEZ (100k no cadastro).
+        Não há mais reset diário/mensal. Se acabar, precisa comprar.
+        """
+        # Sistema de reset removido conforme solicitado
+        return
+
+        # Código antigo comentado abaixo:
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Buscar usuário
+        cursor.execute('''
+            SELECT plan, last_token_reset, token_balance
+            FROM users
+            WHERE id = ?
+        ''', (user_id,))
+
+        result = cursor.fetchone()
+        if not result:
+            conn.close()
+            return
+
+        plan = result['plan']
+        last_reset = result['last_token_reset']
+        current_balance = result['token_balance'] or 0
+
+        # Apenas usuários free têm reset diário
+        if plan != 'free':
+            conn.close()
+            return
+
+        # Converter last_reset para datetime
+        from datetime import datetime, timedelta
+        if last_reset:
+            last_reset_dt = datetime.fromisoformat(last_reset)
+        else:
+            # Se não tem last_reset, assume que é agora
+            last_reset_dt = datetime.now()
+
+        # Verificar se passaram 24 horas
+        time_since_reset = datetime.now() - last_reset_dt
+
+        if time_since_reset >= timedelta(hours=24):
+            # RESET NÃO-CUMULATIVO: volta para 100k
+            free_tokens = PLANS['free']['tokens_month']
+
+            cursor.execute('''
+                UPDATE users
+                SET token_balance = ?, last_token_reset = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (free_tokens, user_id))
+
+            conn.commit()
+            print(f"[DB] ✓ Reset diário de tokens para user {user_id}: {current_balance} → {free_tokens}")
+
         conn.close()
 
     def can_use_tokens(self, user_id: int, tokens_needed: int) -> bool:
@@ -671,9 +744,9 @@ class Database:
                 name = f"Nostr User {npub[:12]}..."
 
             cursor.execute('''
-            INSERT INTO users (email, password_hash, name, role, plan, tokens_limit, npub)
-            VALUES (?, ?, ?, 'user', ?, ?, ?)
-            ''', (f"{npub}@nostr.local", dummy_password_hash, name, plan, PLANS[plan]['tokens_month'], npub))
+            INSERT INTO users (email, password_hash, name, role, plan, tokens_used, tokens_limit, npub, token_balance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (f"{npub}@nostr.local", dummy_password_hash, name, 'user', plan, 0, PLANS[plan]['tokens_month'], npub, PLANS[plan]['tokens_month']))
 
             conn.commit()
             user_id = cursor.lastrowid
@@ -829,6 +902,9 @@ class Database:
         Returns:
             True se tokens foram deduzidos com sucesso, False se saldo insuficiente
         """
+        # Verificar e resetar tokens se passaram 24h (apenas usuários free)
+        self.check_and_reset_daily_tokens(user_id)
+
         conn = self.get_connection()
         cursor = conn.cursor()
 

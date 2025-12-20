@@ -1,15 +1,29 @@
 // Sofia Web - JavaScript Client
 // Developed by Claude for LiberNet
 
-// Configurar marked para syntax highlighting
+// Configurar marked para syntax highlighting (apenas se hljs disponível)
 marked.setOptions({
     highlight: function(code, lang) {
+        // Verificar se hljs está disponível
+        if (typeof hljs === 'undefined') {
+            return code; // Retornar código sem highlight
+        }
+
         if (lang && hljs.getLanguage(lang)) {
             try {
                 return hljs.highlight(code, { language: lang }).value;
-            } catch (e) {}
+            } catch (e) {
+                console.warn('[Sofia] Erro no highlight:', e);
+                return code;
+            }
         }
-        return hljs.highlightAuto(code).value;
+
+        try {
+            return hljs.highlightAuto(code).value;
+        } catch (e) {
+            console.warn('[Sofia] Erro no highlightAuto:', e);
+            return code;
+        }
     },
     breaks: true,
     gfm: true
@@ -68,10 +82,16 @@ function addMessage(role, content, timestamp) {
     messageDiv.appendChild(contentDiv);
     messagesContainer.appendChild(messageDiv);
 
-    // Highlight code blocks
-    messageDiv.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-    });
+    // Highlight code blocks (apenas se hljs disponível)
+    if (typeof hljs !== 'undefined') {
+        messageDiv.querySelectorAll('pre code').forEach((block) => {
+            try {
+                hljs.highlightElement(block);
+            } catch (e) {
+                console.warn('[Sofia] Erro ao aplicar syntax highlighting:', e);
+            }
+        });
+    }
 
     scrollToBottom();
 }

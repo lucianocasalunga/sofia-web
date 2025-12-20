@@ -40,6 +40,7 @@ class SofiaMLSystem:
             CREATE TABLE IF NOT EXISTS conversation_embeddings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
+                chat_id INTEGER,
                 message TEXT NOT NULL,
                 response TEXT NOT NULL,
                 embedding BLOB,
@@ -48,6 +49,13 @@ class SofiaMLSystem:
                 feedback_score REAL DEFAULT 0.0
             )
         """)
+
+        # Migration: Add chat_id column if it doesn't exist (for existing databases)
+        cursor.execute("PRAGMA table_info(conversation_embeddings)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'chat_id' not in columns:
+            cursor.execute("ALTER TABLE conversation_embeddings ADD COLUMN chat_id INTEGER")
+            print("[ML] ✅ Migration: Added chat_id column to conversation_embeddings")
 
         # Tabela de preferências do usuário
         cursor.execute("""
@@ -106,7 +114,7 @@ class SofiaMLSystem:
             print(f"[ML] ❌ Erro ao gerar embedding: {e}")
             return None
 
-    def store_conversation(self, user_id: int, message: str, response: str, context_tags: List[str] = None):
+    def store_conversation(self, user_id: int, chat_id: int, message: str, response: str, context_tags: List[str] = None):
         """Armazena conversa com embedding para aprendizado futuro"""
         try:
             # Combinar mensagem e resposta para embedding
@@ -125,21 +133,21 @@ class SofiaMLSystem:
 
             cursor.execute("""
                 INSERT INTO conversation_embeddings
-                (user_id, message, response, embedding, context_tags)
-                VALUES (?, ?, ?, ?, ?)
-            """, (user_id, message, response, embedding_bytes, tags_json))
+                (user_id, chat_id, message, response, embedding, context_tags)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, chat_id, message, response, embedding_bytes, tags_json))
 
             conn.commit()
             conn.close()
 
-            print(f"[ML] 💾 Conversa armazenada com embedding (user_id: {user_id})")
+            print(f"[ML] 💾 Conversa armazenada com embedding (user_id: {user_id}, chat_id: {chat_id})")
             return True
 
         except Exception as e:
             print(f"[ML] ❌ Erro ao armazenar conversa: {e}")
             return False
 
-    def find_similar_conversations(self, query: str, user_id: Optional[int] = None, limit: int = 5) -> List[Dict]:
+    def find_similar_conversations(self, query: str, user_id: Optional[int] = None, chat_id: Optional[int] = None, limit: int = 5) -> List[Dict]:
         """Busca conversas similares usando embeddings (RAG)"""
         try:
             query_embedding = self.get_embedding(query)
@@ -149,8 +157,14 @@ class SofiaMLSystem:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # Buscar todas as conversas (filtrar por user_id se fornecido)
-            if user_id:
+            # Buscar conversas (filtrar por user_id e chat_id se fornecidos)
+            if user_id and chat_id:
+                cursor.execute("""
+                    SELECT id, message, response, embedding, feedback_score, context_tags
+                    FROM conversation_embeddings
+                    WHERE user_id = ? AND chat_id = ?
+                """, (user_id, chat_id))
+            elif user_id:
                 cursor.execute("""
                     SELECT id, message, response, embedding, feedback_score, context_tags
                     FROM conversation_embeddings
@@ -272,10 +286,10 @@ class SofiaMLSystem:
             print(f"[ML] ❌ Erro ao registrar feedback: {e}")
             return False
 
-    def enhance_context_with_memory(self, user_id: int, current_message: str, max_memories: int = 3) -> str:
+    def enhance_context_with_memory(self, user_id: int, chat_id: int, current_message: str, max_memories: int = 3) -> str:
         """Enriquece contexto com memórias relevantes (RAG)"""
         try:
-            similar_convs = self.find_similar_conversations(current_message, user_id, limit=max_memories)
+            similar_convs = self.find_similar_conversations(current_message, user_id, chat_id, limit=max_memories)
 
             if not similar_convs:
                 return ""
@@ -348,6 +362,7 @@ if __name__ == "__main__":
     # Teste de armazenamento
     success = ml_system.store_conversation(
         user_id=1,
+        chat_id=1,
         message="Como instalar Bitcoin Core?",
         response="Para instalar o Bitcoin Core, você pode usar: sudo apt install bitcoind",
         context_tags=["bitcoin", "instalação", "linux"]
@@ -355,7 +370,7 @@ if __name__ == "__main__":
     print(f"{'✅' if success else '❌'} Teste de armazenamento")
 
     # Teste de busca
-    similar = ml_system.find_similar_conversations("instalar bitcoin", user_id=1, limit=3)
+    similar = ml_system.find_similar_conversations("instalar bitcoin", user_id=1, chat_id=1, limit=3)
     print(f"✅ Encontradas {len(similar)} conversas similares")
 
     # Estatísticas
