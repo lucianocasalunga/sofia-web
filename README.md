@@ -19,6 +19,9 @@
 
 ## 💡 O Que é Sofia?
 
+**SOFIA** = **S**istema **O**peracional de **F**uncionalidades **I**nteligentes **A**utônomas
+*(**S**mart **O**perational **F**ramework for **I**ntelligent **A**ssistance)*
+
 **Sofia** não é apenas mais um chatbot. Ela é a **primeira inteligência artificial verdadeiramente nativa do protocolo Nostr**, combinando:
 
 - 🧠 **GPT-4o** - O modelo mais avançado da OpenAI
