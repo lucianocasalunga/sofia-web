@@ -16,7 +16,7 @@ services:
       - NOSTR_RELAY_URL=wss://relay.libernet.app
       - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
     volumes:
-      - /opt/memoria_sofia.md:/opt/memoria_sofia.md
+      - /opt/IA_MEMORIA_INDICE.md:/opt/IA_MEMORIA_INDICE.md
       - ./logs:/app/logs
       - /mnt/storage/sofia-db:/app/data
       - ./app.py:/app/app.py
