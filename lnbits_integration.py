@@ -239,3 +239,50 @@ class OpenNodeClient:
 
 # Instância global OpenNode
 opennode = OpenNodeClient()
+
+
+# ============================================================================
+# FUNÇÕES WRAPPER (usadas pelo api_routes.py)
+# ============================================================================
+
+def create_lightning_invoice(amount_sats: int, memo: str) -> Optional[Dict]:
+    """
+    Cria invoice Lightning usando LNBits (primário) ou OpenNode (fallback).
+    Retorna: {'payment_hash': str, 'payment_request': str} ou {'error': str}
+    """
+    # Tentar LNBits primeiro
+    if lnbits.invoice_key:
+        result = lnbits.create_invoice(amount_sats, memo)
+        if result:
+            return result
+
+    # Fallback para OpenNode
+    if opennode.api_key:
+        result = opennode.create_invoice(amount_sats, memo)
+        if result:
+            return {
+                'payment_hash': result.get('payment_hash', ''),
+                'payment_request': result.get('bolt11', ''),
+            }
+
+    return {'error': 'Nenhum gateway de pagamento configurado'}
+
+
+def check_payment_status(payment_hash: str) -> Optional[Dict]:
+    """
+    Verifica status de pagamento. Tenta LNBits e OpenNode.
+    Retorna: {'paid': bool} ou None
+    """
+    # Tentar LNBits
+    if lnbits.invoice_key:
+        result = lnbits.check_invoice(payment_hash)
+        if result is not None:
+            return result
+
+    # Tentar OpenNode
+    if opennode.api_key:
+        result = opennode.check_invoice(payment_hash)
+        if result is not None:
+            return result
+
+    return None

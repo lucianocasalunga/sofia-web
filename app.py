@@ -217,16 +217,28 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    """Página principal - apresentação da Sofia"""
-    if current_user.is_authenticated:
-        return redirect(url_for('chat'))
+    """Página principal - React SPA (login + chat)"""
+    return render_template('index.html')
+
+
+@app.route('/creditos')
+def creditos_page():
+    """React SPA - rota /creditos"""
+    return render_template('index.html')
+
+
+@app.route('/configuracoes')
+def configuracoes_page():
+    """React SPA - rota /configuracoes"""
     return render_template('index.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login de usuário"""
-    if request.method == 'POST':
+    """Login - GET serve React SPA, POST mantém endpoint legado"""
+    if request.method == 'GET':
+        return render_template('index.html')
+    # POST - mantém compatibilidade
         # Detectar se é JSON ou form data
         is_json = request.is_json or request.content_type == 'application/json'
 
@@ -395,11 +407,9 @@ def logout():
 # ============= ROTAS DA APLICAÇÃO =============
 
 @app.route('/chat')
-@login_required
 def chat():
-    """Página de chat (protegida)"""
-    user_stats = db.get_user_stats(current_user.id)
-    return render_template('chat.html', user=current_user, stats=user_stats)
+    """React SPA - rota /chat"""
+    return render_template('index.html')
 
 
 @app.route('/api/chat', methods=['POST'])

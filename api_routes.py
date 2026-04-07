@@ -1989,7 +1989,7 @@ def get_weather():
 # ============================================================================
 
 @api_bp.route('/tokens/balance', methods=['GET'])
-@jwt_required(optional=True)
+@jwt_required()
 def get_token_balance():
     """
     Retorna saldo atual de tokens do usuário
@@ -2238,7 +2238,7 @@ def credit_tokens():
 
 
 @api_bp.route('/tokens/transactions', methods=['GET'])
-@jwt_required(optional=True)
+@jwt_required()
 def get_token_transactions():
     """
     Retorna histórico de transações de tokens
